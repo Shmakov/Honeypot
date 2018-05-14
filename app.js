@@ -169,7 +169,7 @@ ftpServer.on('login', ({connection, username, password}, resolve, reject) => {
 ftpServer.listen();
 
 /* SSH2 Server */
-const ssh2_server = new ssh2.Server({hostKeys: [fs.readFileSync('ssh2.private.key')],banner: 'Hi there!',ident: 'OpenSSH_7.6'}, function(client) {
+const ssh2_server = new ssh2.Server({hostKeys: [fs.readFileSync('etc/ssh2.private.key')],banner: 'Hi there!',ident: 'OpenSSH_7.6'}, function(client) {
 	client.on('authentication', function(ctx) {
 		if (ctx.method !== 'password') return ctx.reject(['password']);
 		if (ctx.method === 'password') {
