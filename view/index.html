@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>tail -f /var/log/requests.log</title><!--  hithere@shmakov.net -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script src="tingle.min.js"></script>
+	<script src="favico.min.js"></script>
+	<script src="/socket_io/socket.io.js"></script>
+	<script src="base.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css" />
+	<link rel="stylesheet" type="text/css" href="tingle.min.css" />
+<body>
+<div class="data">
+	<div class="box">
+		<div class="request-stats">
+			<div>Total Requests</div>
+			<div class="amount" id="requests_total">-</div>
+			<div>Since Your Visit</div>
+			<div class="amount" id="requests_since_launch">-</div>
+		</div>
+		<div class="recent-credentials">
+			<div class="header">Recent SSH Usernames/Passwords</div>
+			<div id="recent_credential"></div>
+		</div>
+		<div class="http-requests">
+			<div class="header">Most Popular HTTP Requests</div>
+			<div id="http_requests">
+				<div>/phpadmin/index.php</div>
+				<div>/myadmin/index.php</div>
+				<div>/cgi-bin/index.cgi</div>
+				<div>/tools/phpMyAdmin/index.php</div>
+				<div>/check_proxy</div>
+				<div>/Diagnostics.asp</div>
+			</div>
+		</div>
+	</div>
+	<div id="data-table">
+		<table>
+			<tbody>
+				<tr class="header">
+					<th>Time</th>
+					<th>IP</th>
+					<th>Service</th>
+					<th>Request</th>
+				</tr>
+			</tbody>
+		</table>
+	</div>
+</div>
+</body>
+</html>

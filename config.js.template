@@ -1,0 +1,14 @@
+const config = {
+	server_ip: '35.230.121.210',
+	hostname: 'tail-f.shmakov.net',
+	mysql_connection_string: {
+		connectionLimit: 100,
+		host: 'localhost',
+		port: 3306,
+		user: 'root',
+		password: 'hi-there',
+		database: 'db'
+	},
+};
+
+module.exports = config;
