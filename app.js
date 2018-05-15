@@ -17,8 +17,10 @@ const net = require('net');
 
 const data = [];
 let total_requests_number = 0;
+let recent_credentials = null;
+let popular_requests = null;
 
-/* Initial MySQL query */
+/* Initial MySQL query: total number of requests */
 mysql_pool.getConnection(function(err, connection) {
 	connection.query('SELECT COUNT(*) as cnt FROM request', function (error, results, fields) {
 		total_requests_number = results[0].cnt;
@@ -27,38 +29,43 @@ mysql_pool.getConnection(function(err, connection) {
 	});
 });
 
-/* Get recent username/passwords */
-let recent_ssh_credentials = () => {
-	return new Promise(function(resolve, reject) {
-		mysql_pool.getConnection(function(err, connection) {
-			let query = `
-			SELECT
-				username, password
-			FROM
-				request
-			WHERE
-				username != ''
-			ORDER BY id DESC
-			LIMIT 0 , 6
-			`;
-			connection.query(query, function (error, results, fields) {
-				let rows = [];
-				connection.release();
-				if (error) throw error;
-				results.forEach(function(row){
-					rows.push({'username': row['username'], 'password': row['password']});
-				});
-				resolve(rows);
+/* Get recent username/passwords and most popular pages and update them periodically */
+const get_recent_ssh_credentials = () => {
+	mysql_pool.getConnection(function(err, connection) {
+		let query = `SELECT username, password FROM request WHERE username != '' ORDER BY id DESC LIMIT 0, 6`;
+		connection.query(query, function (error, results, fields) {
+			let rows = [];
+			connection.release();
+			if (error) throw error;
+			results.forEach(function(row){
+				rows.push({'username': row['username'], 'password': row['password']});
 			});
+			recent_credentials = rows;
 		});
 	});
 };
+const get_popular_requests = () => {
+	mysql_pool.getConnection(function(err, connection) {
+		let query = `SELECT http_request_path, COUNT(*) AS cnt FROM request WHERE http_request_path IS NOT NULL GROUP BY http_request_path ORDER BY cnt DESC LIMIT 0,5`;
+		connection.query(query, function (error, results, fields) {
+			let rows = [];
+			connection.release();
+			if (error) throw error;
+			results.forEach(function(row){
+				rows.push({'http_request_path': row['http_request_path']});
+			});
+			popular_requests = rows;
+		});
+	});
+};
+get_recent_ssh_credentials();
+get_popular_requests();
+setInterval(get_recent_ssh_credentials, 60 * 1000); // once a minute
+setInterval(get_popular_requests, 3600 * 1000); // once an hour
 
 /* Websocket server */
 io.on('connection', function(socket) {
-	recent_ssh_credentials().then(function(rows){
-		socket.emit('init', {'data': data, 'total_requests_number': total_requests_number, 'recent_credentials': rows});
-	})
+	socket.emit('init', {'data': data, 'total_requests_number': total_requests_number, 'recent_credentials': recent_credentials, 'popular_requests': popular_requests});
 });
 server.listen(3000);
 
