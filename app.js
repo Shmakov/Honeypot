@@ -46,7 +46,7 @@ const get_recent_ssh_credentials = () => {
 };
 const get_popular_requests = () => {
 	mysql_pool.getConnection(function(err, connection) {
-		let query = `SELECT http_request_path, COUNT(*) AS cnt FROM request WHERE http_request_path IS NOT NULL GROUP BY http_request_path ORDER BY cnt DESC LIMIT 0,5`;
+		let query = `SELECT http_request_path, COUNT(*) AS cnt FROM request WHERE http_request_path IS NOT NULL GROUP BY http_request_path ORDER BY cnt DESC LIMIT 0, 6`;
 		connection.query(query, function (error, results, fields) {
 			let rows = [];
 			connection.release();

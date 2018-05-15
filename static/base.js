@@ -83,13 +83,23 @@ const app = {
 	},
 
 	renderCredentials: function(data) {
-		if (!data || !data[0]) return;
+		if (!data || !(0 in data)) return;
 
 		let html = '';
 		for (let i in data) {
 			html+= '<div>' + app.escapeHtml(data[i]['username']) + ':' + app.escapeHtml(data[i]['password']) + '</div>';
 		}
 		$('#recent_credential').html(html);
+	},
+
+	renderPopularRequests: function(data) {
+		if (!data || !(0 in data)) return;
+
+		let html = '';
+		for (let i in data) {
+			html+= '<div>' + app.escapeHtml(data[i]['http_request_path']) + '</div>';
+		}
+		$('#http_requests').html(html);
 	},
 
 	updateCredentials: function(data) {
@@ -121,6 +131,7 @@ socket.on('init', function(init_data) {
 	app.requests_total = init_data['total_requests_number'];
 	app.renderData(init_data['data']);
 	app.renderCredentials(init_data['recent_credentials']);
+	app.renderPopularRequests(init_data['popular_requests']);
 });
 socket.on('broadcast', function(data) {
 	app.renderRow(data);
