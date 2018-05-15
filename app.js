@@ -30,7 +30,7 @@ mysql_pool.getConnection(function(err, connection) {
 });
 
 /* Get recent username/passwords and most popular pages and update them periodically */
-const get_recent_ssh_credentials = () => {
+const getRecentSshCredentials = () => {
 	mysql_pool.getConnection(function(err, connection) {
 		let query = `SELECT username, password FROM request WHERE username != '' ORDER BY id DESC LIMIT 0, 6`;
 		connection.query(query, function (error, results, fields) {
@@ -44,7 +44,7 @@ const get_recent_ssh_credentials = () => {
 		});
 	});
 };
-const get_popular_requests = () => {
+const getMostPopularRequests = () => {
 	mysql_pool.getConnection(function(err, connection) {
 		let query = `SELECT http_request_path, COUNT(*) AS cnt FROM request WHERE http_request_path IS NOT NULL GROUP BY http_request_path ORDER BY cnt DESC LIMIT 0, 6`;
 		connection.query(query, function (error, results, fields) {
@@ -58,10 +58,10 @@ const get_popular_requests = () => {
 		});
 	});
 };
-get_recent_ssh_credentials();
-get_popular_requests();
-setInterval(get_recent_ssh_credentials, 60 * 1000); // once a minute
-setInterval(get_popular_requests, 3600 * 1000); // once an hour
+getRecentSshCredentials();
+getMostPopularRequests();
+setInterval(getRecentSshCredentials, 60 * 1000); // once a minute
+setInterval(getMostPopularRequests, 3600 * 1000); // once an hour
 
 /* Websocket server */
 io.on('connection', function(socket) {
@@ -69,15 +69,18 @@ io.on('connection', function(socket) {
 });
 server.listen(3000);
 
-/* Custom Servers / telnet */
-class MyServer {
+class CustomSocketServer {
+	/**
+	 * @param {number} port - Socket's Port Number
+	 * @param {string} name - Service Name
+	 */
 	constructor(port, name) {
 		this.port = port;
 		this.name = name;
 		this.start();
 	}
 	start () {
-		let server = net.createServer((socket) => {
+		const server = net.createServer((socket) => {
 			socket.setEncoding('utf8');
 			socket.on('error', (err) => {
 				socket.end();
@@ -101,33 +104,26 @@ class MyServer {
 	log (socket, data) {
 		let ip = socket.remoteAddress;
 		if (ip && ip.substr(0, 7) === "::ffff:") ip = ip.substr(7);
-		if (data && data.toString().trim().length !== 0) {
-			populateData({
-				'ip': ip,
-				'service': this.name,
-				'request': 'Connection from ' + ip + ':' + socket.remotePort,
-				'request_headers': data.toString()
-			});
-		}
-		else {
-			populateData({
-				'ip': ip,
-				'service': this.name,
-				'request': 'Connection from ' + ip + ':' + socket.remotePort
-			});
-		}
+		let info = {
+			'ip': ip,
+			'service': this.name,
+			'request': 'Connection from ' + ip + ':' + socket.remotePort
+		};
+		if (data && data.toString().trim().length !== 0) info.request_headers = data.toString();
+
+		populateData(info);
 	}
 }
-let telnet = new MyServer(23, 'telnet');
-let dns = new MyServer(53, 'DNS');
-let pop = new MyServer(110, 'POP3');
-let netbios1 = new MyServer(137, 'NetBIOS');
-let netbios2 = new MyServer(138, 'NetBIOS');
-let netbios3 = new MyServer(139, 'NetBIOS');
-let mysql_server = new MyServer(3306, 'MySQL');
-let mssql = new MyServer(1433, 'MSSQL');
-let mongodb = new MyServer(27017, 'MongoDB');
-let memcached = new MyServer(11211, 'memcached');
+let telnet = new CustomSocketServer(23, 'telnet');
+let dns = new CustomSocketServer(53, 'DNS');
+let pop = new CustomSocketServer(110, 'POP3');
+let netbios1 = new CustomSocketServer(137, 'NetBIOS');
+let netbios2 = new CustomSocketServer(138, 'NetBIOS');
+let netbios3 = new CustomSocketServer(139, 'NetBIOS');
+let mysql_server = new CustomSocketServer(3306, 'MySQL');
+let mssql = new CustomSocketServer(1433, 'MSSQL');
+let mongodb = new CustomSocketServer(27017, 'MongoDB');
+let memcached = new CustomSocketServer(11211, 'memcached');
 
 /* Ping (tcpdump) */
 let cmd = 'tcpdump';
