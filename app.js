@@ -13,7 +13,7 @@ const escape = require('escape-html');
 const mysql_pool = require('mysql').createPool(config.mysql_connection_string);
 const spawn = require('child_process').spawn;
 const {FtpSrv, FileSystem} = require('ftp-srv');
-const net = require('net');
+const CustomSocketServer = require('./lib/custom-socket-server');
 
 const data = [];
 let total_requests_number = 0;
@@ -69,61 +69,17 @@ io.on('connection', function(socket) {
 });
 server.listen(3000);
 
-class CustomSocketServer {
-	/**
-	 * @param {number} port - Socket's Port Number
-	 * @param {string} name - Service Name
-	 */
-	constructor(port, name) {
-		this.port = port;
-		this.name = name;
-		this.start();
-	}
-	start () {
-		const server = net.createServer((socket) => {
-			socket.setEncoding('utf8');
-			socket.on('error', (err) => {
-				socket.end();
-				socket.destroy();
-			});
-			socket.write('Hi There ' + socket.remoteAddress + ':' + socket.remotePort + '\r\n');
-			socket.setTimeout(5000);
-			socket.on('timeout', () => {
-				this.log(socket);
-				socket.end();
-				socket.destroy();
-			});
-			socket.on('data', (data) => {
-				this.log(socket, data);
-				socket.end();
-				socket.destroy();
-			});
-		});
-		server.listen(this.port, () => {});
-	}
-	log (socket, data) {
-		let ip = socket.remoteAddress;
-		if (ip && ip.substr(0, 7) === "::ffff:") ip = ip.substr(7);
-		let info = {
-			'ip': ip,
-			'service': this.name,
-			'request': 'Connection from ' + ip + ':' + socket.remotePort
-		};
-		if (data && data.toString().trim().length !== 0) info.request_headers = data.toString();
-
-		populateData(info);
-	}
-}
-let telnet = new CustomSocketServer(23, 'telnet');
-let dns = new CustomSocketServer(53, 'DNS');
-let pop = new CustomSocketServer(110, 'POP3');
-let netbios1 = new CustomSocketServer(137, 'NetBIOS');
-let netbios2 = new CustomSocketServer(138, 'NetBIOS');
-let netbios3 = new CustomSocketServer(139, 'NetBIOS');
-let mysql_server = new CustomSocketServer(3306, 'MySQL');
-let mssql = new CustomSocketServer(1433, 'MSSQL');
-let mongodb = new CustomSocketServer(27017, 'MongoDB');
-let memcached = new CustomSocketServer(11211, 'memcached');
+/* Basic Custom Socket servers listening on different ports */
+(new CustomSocketServer(23, 'telnet')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(53, 'DNS')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(110, 'POP3')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(137, 'NetBIOS')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(138, 'NetBIOS')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(139, 'NetBIOS')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(3306, 'MySQL')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(1433, 'MSSQL')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(27017, 'MongoDB')).on('data', (data) => { populateData(data); });
+(new CustomSocketServer(11211, 'memcached')).on('data', (data) => { populateData(data); });
 
 /* Ping (tcpdump) */
 let cmd = 'tcpdump';
