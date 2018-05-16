@@ -12,7 +12,7 @@ const fs = require('fs');
 const escape = require('escape-html');
 const mysql_pool = require('mysql').createPool(config.mysql_connection_string);
 const spawn = require('child_process').spawn;
-const {FtpSrv, FileSystem} = require('ftp-srv');
+const FtpSrv = require('ftp-srv');
 const CustomSocketServer = require('./lib/custom-socket-server');
 
 const data = [];
@@ -81,11 +81,11 @@ server.listen(3000);
 (new CustomSocketServer(27017, 'MongoDB')).on('data', (data) => { populateData(data); });
 (new CustomSocketServer(11211, 'memcached')).on('data', (data) => { populateData(data); });
 
-/* Ping (tcpdump) */
+/* Catching ICMP echo requests (ping) using tcpdump */
 let cmd = 'tcpdump';
 let args = ['-nvvv', '-l', '-i', 'eth0', 'icmp', 'and', 'icmp[icmptype]=icmp-echo'];
 const child = spawn(cmd, args, {stdio: ['ignore', 'pipe', 'ignore']});
-child.stdout.on('data', function (data) {
+child.stdout.on('data', (data) => {
 	try {
 		let echo_request = data.toString();
 		let echo_request_ip = echo_request.split("\n")[1].split(">")[0].trim();
@@ -100,20 +100,7 @@ child.stdout.on('data', function (data) {
 });
 
 /* FTP Server */
-class MyFileSystem extends FileSystem {
-	constructor() {super(...arguments);}
-	currentDirectory() {return;}
-	get(fileName) {return;}
-	list(path = '.') {return;}
-	chdir(path = '.') {return;}
-	write(fileName, {append = false, start = undefined} = {}) {return;}
-	read(fileName, {start = undefined} = {}) {return;}
-	delete(path) {return;}
-	mkdir(path) {return;}
-	rename(from, to) {return;}
-	chmod(path, mode) {return;}
-}
-const ftpServer = new FtpSrv('ftp://0.0.0.0:21', {fs: MyFileSystem, greeting: 'Hi There!', anonymous: true, log: require('bunyan').createLogger({level:60, name: 'noname'})});
+const ftpServer = new FtpSrv('ftp://0.0.0.0:21', {fs: require('./lib/custom-ftp-file-system'), greeting: 'Hi There!', anonymous: true, log: require('bunyan').createLogger({level:60, name: 'noname'})});
 ftpServer.on('login', ({connection, username, password}, resolve, reject) => {
 	connection.close();
 
