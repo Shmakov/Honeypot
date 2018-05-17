@@ -33,7 +33,7 @@ server.listen(3000);
 
 /**
  * Custom Socket Server: listening on ~128 most common TCP ports
- * @see: /lib/tcp-ports
+ * @see: ./lib/tcp-ports
  */
 for (let port in tcp_ports) {
 	(new CustomSocketServer(port, tcp_ports[port])).on('data', (data) => { emitData(data); });
@@ -158,7 +158,7 @@ app.all('*', (req, res) => {
 app.listen(30101);
 
 /**
- * Emits data to the socket clients and also saves it in the MySQL database
+ * Emits data to the WebSocket clients and also saves it in the MySQL database
  * @param item
  */
 const emitData = (item) => {
