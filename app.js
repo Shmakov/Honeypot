@@ -9,7 +9,6 @@ const io = require('socket.io')(server);
 const ssh2 = require('ssh2');
 const fs = require('fs');
 const escape = require('escape-html');
-const mysqlPool = require('mysql').createPool(config.mysql_connection_string);
 const { spawn } = require('child_process');
 const FtpSrv = require('ftp-srv');
 const CustomSocketServer = require('./lib/custom-socket-server');
@@ -111,48 +110,16 @@ const ssh2_server = new ssh2.Server({
 	client._client_info = info;
 }).listen(22);
 
-/* MySQL query: total number of requests */
-mysqlPool.getConnection((err, connection) => {
-	connection.query('SELECT COUNT(*) as cnt FROM request', (error, results, fields) => {
-		total_requests_number = results[0].cnt;
-		connection.release();
-		if (error) throw error;
-	});
+/* MySQL Helper */
+(new helper.Mysql()).on('total_requests_number', (count) => {
+	total_requests_number = count;
+}).on('recent_credentials', (rows) => {
+	// Returns recent SSH/FTP usernames/passwords
+	recent_credentials = rows;
+}).on('popular_requests', (rows) => {
+	// Returns most popular HTTP requests
+	popular_requests = rows;
 });
-
-/* Get recent username/passwords and most popular pages and update them periodically */
-const getRecentSshCredentials = () => {
-	mysqlPool.getConnection((err, connection) => {
-		let query = `SELECT username, password FROM request WHERE username != '' ORDER BY id DESC LIMIT 0, 6`;
-		connection.query(query, (error, results, fields) => {
-			let rows = [];
-			connection.release();
-			if (error) throw error;
-			results.forEach((row) => {
-				rows.push({'username': row['username'], 'password': row['password']});
-			});
-			recent_credentials = rows;
-		});
-	});
-};
-const getMostPopularRequests = () => {
-	mysqlPool.getConnection((err, connection) => {
-		let query = `SELECT http_request_path, COUNT(*) AS cnt FROM request WHERE http_request_path IS NOT NULL GROUP BY http_request_path ORDER BY cnt DESC LIMIT 0, 6`;
-		connection.query(query, (error, results, fields) => {
-			let rows = [];
-			connection.release();
-			if (error) throw error;
-			results.forEach((row) => {
-				rows.push({'http_request_path': row['http_request_path']});
-			});
-			popular_requests = rows;
-		});
-	});
-};
-getRecentSshCredentials();
-getMostPopularRequests();
-setInterval(getRecentSshCredentials, 60 * 1000); // once a minute
-setInterval(getMostPopularRequests, 3600 * 1000); // once an hour
 
 /* Express App */
 app.enable('trust proxy', 1);
@@ -196,24 +163,15 @@ app.listen(30101);
  */
 const emitData = (item) => {
 	total_requests_number++;
+
 	item.timestamp = Date.now();
-
 	if (item.ip && item.ip.substr(0, 7) === "::ffff:") item.ip = item.ip.substr(7);
-
-	data[data.length] = item;
 
 	io.emit('broadcast', item);
 
-	let request = {'ip': item.ip, 'service': item.service, 'request': item.request, 'request_headers': item.request_headers};
-	if ('username' in item) request.username = item['username'];
-	if ('password' in item) request.password = item['password'];
-	if ('http_request_path' in item) request.http_request_path = item['http_request_path'];
-	mysqlPool.getConnection((err, connection) => {
-		let query = connection.query('INSERT INTO request SET ?', request, (error, results, fields) => {
-			connection.release();
-			if (error) throw error;
-		});
-	});
+	data[data.length] = item;
+
+	helper.saveToDatabase(item);
 };
 
 /* Cleaning Up Old Data */
