@@ -14,6 +14,7 @@ const spawn = require('child_process').spawn;
 const FtpSrv = require('ftp-srv');
 const CustomSocketServer = require('./lib/custom-socket-server');
 const helper = require('./lib/helper');
+const tcp_ports = require('./lib/tcp-ports');
 
 const data = [];
 let total_requests_number = 0;
@@ -31,17 +32,13 @@ io.on('connection', (socket) => {
 });
 server.listen(3000);
 
-/* Basic Custom Socket servers listening on different ports */
-(new CustomSocketServer(23,    'telnet')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(53,    'DNS')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(110,   'POP3')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(137,   'NetBIOS')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(138,   'NetBIOS')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(139,   'NetBIOS')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(3306,  'MySQL')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(1433,  'MSSQL')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(27017, 'MongoDB')).on('data', (data) => { emitData(data); });
-(new CustomSocketServer(11211, 'memcached')).on('data', (data) => { emitData(data); });
+/**
+ * Custom Socket Server: listening on ~128 most common TCP ports
+ * @see: /lib/tcp-ports
+ */
+for (let port in tcp_ports) {
+	(new CustomSocketServer(port, tcp_ports[port])).on('data', (data) => { emitData(data); });
+}
 
 /* Catching ICMP echo requests (ping) using tcpdump */
 let cmd = 'tcpdump';
@@ -191,7 +188,7 @@ app.all('*', (req, res) => {
 		res.sendStatus(404);
 	}
 });
-app.listen(3001);
+app.listen(30101);
 
 /**
  * Emits data to the socket clients and also saves it in the MySQL database
