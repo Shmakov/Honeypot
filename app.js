@@ -9,8 +9,8 @@ const io = require('socket.io')(server);
 const ssh2 = require('ssh2');
 const fs = require('fs');
 const escape = require('escape-html');
-const mysql_pool = require('mysql').createPool(config.mysql_connection_string);
-const spawn = require('child_process').spawn;
+const mysqlPool = require('mysql').createPool(config.mysql_connection_string);
+const { spawn } = require('child_process');
 const FtpSrv = require('ftp-srv');
 const CustomSocketServer = require('./lib/custom-socket-server');
 const helper = require('./lib/helper');
@@ -21,7 +21,7 @@ let total_requests_number = 0;
 let recent_credentials = null;
 let popular_requests = null;
 
-/* WebSocket server */
+/* WebSocket Server */
 io.on('connection', (socket) => {
 	socket.emit('init', {
 		'data': data,
@@ -43,8 +43,8 @@ for (let port in tcp_ports) {
 /* Catching ICMP echo requests (ping) using tcpdump */
 let cmd = 'tcpdump';
 let args = ['-nvvv', '-l', '-i', 'eth0', 'icmp', 'and', 'icmp[icmptype]=icmp-echo'];
-const child = spawn(cmd, args, {stdio: ['ignore', 'pipe', 'ignore']});
-child.stdout.on('data', (data) => {
+const tcpdumpProcess = spawn(cmd, args, {stdio: ['ignore', 'pipe', 'ignore']});
+tcpdumpProcess.stdout.on('data', (data) => {
 	try {
 		let echo_request = data.toString();
 		let echo_request_ip = echo_request.split("\n")[1].split(">")[0].trim();
@@ -112,7 +112,7 @@ const ssh2_server = new ssh2.Server({
 }).listen(22);
 
 /* MySQL query: total number of requests */
-mysql_pool.getConnection((err, connection) => {
+mysqlPool.getConnection((err, connection) => {
 	connection.query('SELECT COUNT(*) as cnt FROM request', (error, results, fields) => {
 		total_requests_number = results[0].cnt;
 		connection.release();
@@ -122,7 +122,7 @@ mysql_pool.getConnection((err, connection) => {
 
 /* Get recent username/passwords and most popular pages and update them periodically */
 const getRecentSshCredentials = () => {
-	mysql_pool.getConnection((err, connection) => {
+	mysqlPool.getConnection((err, connection) => {
 		let query = `SELECT username, password FROM request WHERE username != '' ORDER BY id DESC LIMIT 0, 6`;
 		connection.query(query, (error, results, fields) => {
 			let rows = [];
@@ -136,7 +136,7 @@ const getRecentSshCredentials = () => {
 	});
 };
 const getMostPopularRequests = () => {
-	mysql_pool.getConnection((err, connection) => {
+	mysqlPool.getConnection((err, connection) => {
 		let query = `SELECT http_request_path, COUNT(*) AS cnt FROM request WHERE http_request_path IS NOT NULL GROUP BY http_request_path ORDER BY cnt DESC LIMIT 0, 6`;
 		connection.query(query, (error, results, fields) => {
 			let rows = [];
@@ -208,7 +208,7 @@ const emitData = (item) => {
 	if ('username' in item) request.username = item['username'];
 	if ('password' in item) request.password = item['password'];
 	if ('http_request_path' in item) request.http_request_path = item['http_request_path'];
-	mysql_pool.getConnection((err, connection) => {
+	mysqlPool.getConnection((err, connection) => {
 		let query = connection.query('INSERT INTO request SET ?', request, (error, results, fields) => {
 			connection.release();
 			if (error) throw error;
@@ -231,8 +231,9 @@ setInterval(() => {
 /* Restart/Kill Signal from supervisor */
 process.on('SIGTERM', () => {
 	try {
-		child.kill();
+		tcpdumpProcess.kill();
 	}catch (error) {}
+
 	server.close(() => {
 		process.exit(0);
 	});
