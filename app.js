@@ -3,6 +3,7 @@
 const config = require('./config');
 const express = require('express');
 const app = express();
+const bodyParser = require('body-parser');
 const helmet = require('helmet');
 const server = require('http').createServer(app);
 const io = require('socket.io')(server);
@@ -124,6 +125,7 @@ const ssh2_server = new ssh2.Server({
 /* Express App */
 app.enable('trust proxy', 1);
 app.use(helmet());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use((req, res, next) => {
 	let item = {
 		'ip': req.ip,
@@ -149,7 +151,8 @@ app.get('/', (req, res) => {
 app.all('*', (req, res) => {
 	if (req.hostname === config.hostname || req.hostname === config.server_ip) {
 		let response = req.hostname ? req.method + ' ' + req.protocol + '://' + req.hostname + req.originalUrl : req.method + ' ' + req.originalUrl;
-		res.status(200).send(escape(response));
+		if (req.body.length !== 0) response+= "\r\n\r\n" + helper.formatHeaders(req.body);
+		res.status(200).send("<pre>" + escape(response) + "</pre>");
 	}
 	else {
 		res.sendStatus(404);
