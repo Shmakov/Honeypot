@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "body-parser": "^1.18.3",
     "escape-html": "^1.0.3",
     "express": "^4.16.2",
     "ftp-srv": "^2.16.1",
