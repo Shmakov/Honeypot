@@ -31,3 +31,14 @@ body {
 			height: 450px;
 			float: left;
 		}
+	.credentials {
+		width: 40%;
+		float: left;
+	}
+	.requests {
+		width: 55%;
+		float: right;
+	}
+	.credentials .table, .requests .table {
+		height: 450px;
+	}

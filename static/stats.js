@@ -8,6 +8,8 @@ const Stats = {
 
 		google.charts.load('current', {'packages':['table']});
 		google.charts.setOnLoadCallback(Stats.drawServicesTable);
+		google.charts.setOnLoadCallback(Stats.drawCredentialsTable);
+		google.charts.setOnLoadCallback(Stats.drawRequestsTable);
 		window.setTimeout(() =>{
 			Stats.drawServices();
 		}, 0);
@@ -71,6 +73,45 @@ const Stats = {
 		}
 
 		let table = new google.visualization.Table(document.getElementById('services-table'));
+
+		let options = {
+			showRowNumber: true,
+			width: '100%',
+			height: '100%'
+		};
+		table.draw(data, options);
+	},
+
+	drawRequestsTable: function() {
+		let data = new google.visualization.DataTable();
+		data.addColumn('string', 'Request Path');
+		data.addColumn('number', '#');
+		for (let i = 0; i < Stats.data.requests.length; i++) {
+			let row = Stats.data.requests[i];
+			let request = row['request'].length > 64 ? row['request'].substring(0, 64) + '...' : row['request'];
+			data.addRow([request, row['total']]);
+		}
+
+		let table = new google.visualization.Table(document.getElementById('requests-table'));
+
+		let options = {
+			showRowNumber: true,
+			width: '100%',
+			height: '100%'
+		};
+		table.draw(data, options);
+	},
+
+	drawCredentialsTable: function() {
+		let data = new google.visualization.DataTable();
+		data.addColumn('string', 'Username/Password');
+		data.addColumn('number', '#');
+		for (let i = 0; i < Stats.data.credentials.length; i++) {
+			let row = Stats.data.credentials[i];
+			data.addRow([row['credentials'], row['total']]);
+		}
+
+		let table = new google.visualization.Table(document.getElementById('credentials-table'));
 
 		let options = {
 			showRowNumber: true,
