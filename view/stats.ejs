@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Monthly Stats</title>
+	<link rel="stylesheet" type="text/css" href="style-stats.css" />
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+	<script src="https://code.highcharts.com/highcharts.src.js"></script>
+	<script type="text/javascript" src="stats.js"></script>
+	<script>
+		Stats.init(<%- JSON.stringify(data) %>);
+	</script>
+</head>
+<body>
+<div class="stats">
+	<div class="services">
+		<div class="table" id="services-table"></div>
+		<div class="piechart" id="piechart"></div>
+		<div class="clear"></div>
+	</div>
+</div>
+</body>
+</html>

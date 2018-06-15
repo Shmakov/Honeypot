@@ -17,6 +17,7 @@ const helper = require('./lib/helper');
 const tcp_ports = require('./lib/tcp-ports');
 
 const data = [];
+let monthly_stats;
 let total_requests_number = 0;
 let recent_credentials = null;
 let popular_requests = null;
@@ -120,11 +121,15 @@ const ssh2_server = new ssh2.Server({
 }).on('popular_requests', (rows) => {
 	// Returns most popular HTTP requests
 	popular_requests = rows;
+}).on('monthly_stats', (stats) => {
+	monthly_stats = stats;
 });
 
 /* Express App */
 app.enable('trust proxy', 1);
 app.use(helmet());
+app.set('view engine', 'ejs');
+app.set('views', './view');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use((req, res, next) => {
 	let item = {
@@ -147,6 +152,9 @@ app.use((req, res, next) => {
 app.use(express.static('static'));
 app.get('/', (req, res) => {
 	res.sendFile('view/index.html' , { root : __dirname});
+});
+app.get('/stats', (req, res) => {
+	res.render('stats', {data: monthly_stats})
 });
 app.all('*', (req, res) => {
 	if (req.hostname === config.hostname || req.hostname === config.server_ip) {
