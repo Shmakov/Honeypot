@@ -1,21 +1,26 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto:400,500|Roboto+Mono:400,700');
+
 html,
 body {
 	height: 100%;
 	margin: 0;
 }
 body {
-	background: #07263b;
+	background: #0e1626;
 	color: white;
 	font-size: 14px;
-	font-family: Courier, monospace, sans-serif;
+	font-family: 'Roboto Mono', sans-serif;
+	font-weight: 400;
 }
 .data {
-	max-width: 1200px;
+	max-width: 960px;
 	margin: 0 auto;
 	padding: 20px 15px;
 }
 #data-table {
-	overflow: auto;
+	overflow: hidden;
+	font-family: 'Roboto', sans-serif;
+	padding: 15px;
 }
 #data-table table {
 	margin: 0;
@@ -23,31 +28,37 @@ body {
 	border-spacing: 0;
 	border-collapse: collapse;
 }
-#data-table th {
-	text-align: left;
-	padding: 4px 15px 4px 3px;
-}
-#data-table tbody tr.header {
-	background: #0098ff;
-}
-#data-table tr:nth-child(odd) {
-	background: #123852;
-}
 #data-table td {
-	padding: 1px 15px 1px 3px;
+	padding: 0 25px 3px 0;
+	white-space: nowrap;
 }
 #data-table tr, #data-table td {
 	border-spacing: 0;
 	border-collapse: collapse;
 }
-#data-table tr:hover {
-	background-color: #0098ff;
+#data-table .request {
+	width: 100%;
+	font-weight: 500;
+}
+#data-table .ip {
+	color: #f39c12;
+}
+#data-table .time {
+	color: #6d6d6d;
+}
+#data-table .service {
+	color: #27af60;
+	font-weight: 500;
+}
+#data-table .request, #data-table .request a {
+	color: #efefef;
 }
 #data-table a {
 	text-decoration: none;
-	border-bottom: 1px dashed #cacaca;
-	color: white;
 	white-space: nowrap;
+}
+#data-table a:hover {
+	border-bottom: 1px dashed #cacaca;
 }
 .tingle-modal-box__content {
 	color: black;
@@ -62,45 +73,58 @@ body {
 }
 .box .amount {
 	font-size: 200%;
-	font-weight: bold;
+	font-weight: 700;
 }
 .box .header {
-	font-weight: bold;
+	font-weight: 700;
 }
 .data .box > div {
 	float: left;
 	padding: 15px;
 	width: 33.333%;
-	height: 140px;
+	height: 160px;
 	overflow: hidden;
-	/*min-width: 240px;*/
 	box-sizing: border-box;
 	white-space: nowrap;
 }
 .request-stats {
-	background: #02b900;
+	background: #ec7b66;
 }
 .recent-credentials {
-	background: #0f57a6;
+	background: #404e57;
 }
-.http-requests {
-	background: #ff9900;
+.monthly-stats {
+	background: #45a7b9;
+	text-align: center;
+}
+.monthly-stats a {
+	color: white;
+	font-size: 150%;
+	line-height: 130px;
+	text-decoration: underline;
 }
 #requests_total {
-	margin-bottom: 15px;
-}
-#recent_credential {
-
+	margin-bottom: 25px;
 }
 
 @media (max-width: 480px) {
+	.data {
+		padding: 15px;
+	}
+	#data-table {
+		padding: 0;
+		overflow: auto;
+	}
 	.data .box {
 		margin: 0 0 20px;
 	}
 	.data .box > div {
 		width: 100%;
 	}
-	.http-requests, .recent-credentials {
+	.monthly-stats, .recent-credentials {
+		display: none;
+	}
+	#data-table .ip {
 		display: none;
 	}
 }
@@ -112,11 +136,10 @@ body {
 	.data .box > div {
 		width: 50%;
 	}
-	.http-requests {
+	.monthly-stats {
 		display: none;
 	}
-}
-
-@media (min-width: 768px) {
-
+	#data-table .ip {
+		display: none;
+	}
 }
