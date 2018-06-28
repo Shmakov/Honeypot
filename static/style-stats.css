@@ -6,13 +6,21 @@ body {
 	margin: 0;
 }
 body {
-	background: white;
 	background: #0e1626;
-	color: black;
-	color: #B0B0B3;
 	color: #8197b1;
 	font-size: 14px;
 	font-family: 'Roboto', sans-serif;
+}
+
+::-webkit-scrollbar {
+	width: 0.5em;
+}
+::-webkit-scrollbar-track {
+	-webkit-box-shadow: inset 0 0 6px rgba(0,0,0,0.3);
+}
+::-webkit-scrollbar-thumb {
+	background-color: #8197b1;
+	outline: 1px solid slategrey;
 }
 
 h2, h3 {
@@ -47,14 +55,10 @@ h3 {
 			float: left;
 		}
 	.credentials {
-		width: 40%;
-		float: left;
 		width: 35%;
 		float: right;
 	}
 	.requests {
-		width: 55%;
-		float: right;
 		width: 54%;
 		float: left;
 	}
@@ -63,24 +67,21 @@ h3 {
 	}
 
 .google-visualization-table-tr-head {
-	background-color: #fafafa !important;
 	background-color: #0e1626 !important;
-	color: #d8d8d8;
 	color: #cfd7e6;
 }
 .google-visualization-table-tr-even {
-	background-color: #243350 !important;
 	background-color: #0e1626 !important;
 }
 .google-visualization-table-tr-odd {
 	background-color: #0e1626 !important;
 }
 .google-visualization-table-th {
-	background: none !important;
+	background: #0e1626 !important;
 }
 
 .table > div > div {
-	overflow: hidden !important;
+	/*overflow: hidden !important;*/
 }
 td, th {
 	border: none !important;
