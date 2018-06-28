@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto:400,700');
+
 html,
 body {
 	height: 100%;
@@ -7,13 +9,14 @@ body {
 	background: white;
 	color: black;
 	font-size: 14px;
-	font-family: 'Trebuchet MS', Arial, sans-serif;
+	font-family: 'Roboto', sans-serif;
 }
 
 h2, h3 {
 	text-align: center;
 	font-size: 2em;
 	margin: 1em 0;
+	font-weight: 700;
 }
 h3 {
 	font-size: 1.5em;
@@ -51,3 +54,12 @@ h3 {
 	.credentials .table, .requests .table {
 		height: 450px;
 	}
+
+.google-visualization-table-table .google-visualization-table-th {
+	font-family: 'Roboto', sans-serif;
+	font-weight: 700;
+}
+.google-visualization-table-table .google-visualization-table-td {
+	font-family: 'Roboto', sans-serif;
+	font-weight: 400;
+}

@@ -20,15 +20,13 @@ const data = [];
 let monthly_stats;
 let total_requests_number = 0;
 let recent_credentials = null;
-let popular_requests = null;
 
 /* WebSocket Server */
 io.on('connection', (socket) => {
 	socket.emit('init', {
 		'data': data,
 		'total_requests_number': total_requests_number,
-		'recent_credentials': recent_credentials,
-		'popular_requests': popular_requests
+		'recent_credentials': recent_credentials
 	});
 });
 server.listen(3000);
@@ -118,9 +116,6 @@ const ssh2_server = new ssh2.Server({
 }).on('recent_credentials', (rows) => {
 	// Returns recent SSH/FTP usernames/passwords
 	recent_credentials = rows;
-}).on('popular_requests', (rows) => {
-	// Returns most popular HTTP requests
-	popular_requests = rows;
 }).on('monthly_stats', (stats) => {
 	monthly_stats = stats;
 });

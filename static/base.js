@@ -4,7 +4,7 @@ const app = {
 	modal: null,
 	requests_total: 0,
 	requests_since_launch: 0,
-	favico: null,
+	last_ip_address: null,
 
 	init: function() {
 		app.modal = new tingle.modal();
@@ -20,9 +20,8 @@ const app = {
 			app.modal.setContent(content);
 			app.modal.open();
 		});
-		app.favico = new Favico({
-			animation: 'none'
-		});
+
+		favicon.init();
 	},
 
 	renderData: function(data) {
@@ -43,10 +42,10 @@ const app = {
 
 		let html = '';
 		html+= '<tr>';
-		html+= app.renderCell(('0' + current_date.getHours()).slice(-2) + ':' + ('0' + current_date.getMinutes()).slice(-2) + ':' + ('0' + current_date.getSeconds()).slice(-2) + '.' + current_date.getMilliseconds());
-		html+= app.renderCell(data.ip);
-		html+= app.renderCell(data.service);
-		html+= app.renderCell(data.request, modal_title, data.request_headers);
+		html+= app.renderCell((data.ip === app.last_ip_address ? '' : (app.last_ip_address = data.ip)), 'ip');
+		html+= app.renderCell(('0' + current_date.getHours()).slice(-2) + ':' + ('0' + current_date.getMinutes()).slice(-2) + ':' + ('0' + current_date.getSeconds()).slice(-2) + '.' + current_date.getMilliseconds(), 'time');
+		html+= app.renderCell(data.service, 'service');
+		html+= app.renderCell(data.request, 'request', modal_title, data.request_headers);
 		html+= '</tr>';
 
 		$('#data-table').find('tbody').append( html );
@@ -56,17 +55,17 @@ const app = {
 		app.updateStats();
 	},
 
-	renderCell: function(text, fullTextTitle, fullText) {
+	renderCell: function(text, cssClass, fullTextTitle, fullText) {
 		let td = '';
 		let extra = '';
-		let text_to_display = text ? app.escapeHtml(text.substr(0, 60)) : '-';
+		let text_to_display = text ? app.escapeHtml(text.substr(0, 120)) : '';
 		let title = text ? app.escapeHtml(text) : '';
 
 		if (fullText && fullText.length !== 0) {
 			extra += ' data-full-text=\'' + app.escapeHtml(fullText) + '\' ';
 			if (fullTextTitle && fullTextTitle.length !== 0) extra += ' data-full-text-title=\'' + app.escapeHtml(fullTextTitle) + '\' ';
 		}
-		td+= '<td' + extra + '>';
+		td+= '<td' + extra + ' class="' + cssClass + '">';
 		if (extra.length !== 0) td+= '<a href="#" class="full-text" title="' + title + '">' + text_to_display + '</a>';
 		else td+= '<span title="' + title + '">' + text_to_display + '</span>';
 		td+= '</td>';
@@ -79,7 +78,6 @@ const app = {
 		app.requests_since_launch++;
 		$('#requests_total').text(app.requests_total);
 		$('#requests_since_launch').text(app.requests_since_launch);
-		app.favico.badge(app.requests_since_launch);
 	},
 
 	renderCredentials: function(data) {
@@ -90,16 +88,6 @@ const app = {
 			html+= '<div>' + app.escapeHtml(data[i]['username']) + ':' + app.escapeHtml(data[i]['password']) + '</div>';
 		}
 		$('#recent_credential').html(html);
-	},
-
-	renderPopularRequests: function(data) {
-		if (!data || !(0 in data)) return;
-
-		let html = '';
-		for (let i in data) {
-			html+= '<div>' + app.escapeHtml(data[i]['http_request_path']) + '</div>';
-		}
-		$('#http_requests').html(html);
 	},
 
 	updateCredentials: function(data) {
@@ -125,13 +113,33 @@ const app = {
 	}
 };
 
+const favicon = {
+	favico: null,
+	current: null,
+
+	init: function() {
+		favicon.favico = new Favico({
+			animation: 'none'
+		});
+		// That's mostly done for the optimisations reasons.
+		// When there are a lot of requests, setting `favico.badge` often slows down the browser.
+		window.setInterval(favicon.update, 300);
+	},
+
+	update: function() {
+		if (favicon.current !== app.requests_since_launch) {
+			favicon.current = app.requests_since_launch;
+			favicon.favico.badge(app.requests_since_launch);
+		}
+	}
+};
+
 let socket = io();
 
 socket.on('init', function(init_data) {
 	app.requests_total = init_data['total_requests_number'];
 	app.renderData(init_data['data']);
 	app.renderCredentials(init_data['recent_credentials']);
-	app.renderPopularRequests(init_data['popular_requests']);
 });
 socket.on('broadcast', function(data) {
 	app.renderRow(data);

@@ -5,12 +5,12 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>tail -f /var/log/requests.log</title><!--  hithere@shmakov.net -->
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-	<script src="tingle.min.js"></script>
-	<script src="favico.min.js"></script>
+	<script src="/tingle.min.js"></script>
+	<script src="/favico.min.js"></script>
 	<script src="/socket_io/socket.io.js"></script>
-	<script src="base.js"></script>
-	<link rel="stylesheet" type="text/css" href="style.css" />
-	<link rel="stylesheet" type="text/css" href="tingle.min.css" />
+	<script src="/base.js"></script>
+	<link rel="stylesheet" type="text/css" href="/style.css" />
+	<link rel="stylesheet" type="text/css" href="/tingle.min.css" />
 <body>
 <div class="data">
 	<div class="box">
@@ -24,21 +24,13 @@
 			<div class="header">Recent SSH Usernames/Passwords</div>
 			<div id="recent_credential">-</div>
 		</div>
-		<div class="http-requests">
-			<div class="header">Most Popular HTTP Requests</div>
-			<div id="http_requests">-</div>
+		<div class="monthly-stats">
+			<a href="/stats">Monthly Stats</a>
 		</div>
 	</div>
 	<div id="data-table">
 		<table>
-			<tbody>
-				<tr class="header">
-					<th>Time</th>
-					<th>IP</th>
-					<th>Service</th>
-					<th>Request</th>
-				</tr>
-			</tbody>
+			<tbody></tbody>
 		</table>
 	</div>
 </div>
