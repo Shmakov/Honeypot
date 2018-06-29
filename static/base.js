@@ -76,7 +76,7 @@ const app = {
 	updateStats: function() {
 		app.requests_total++;
 		app.requests_since_launch++;
-		$('#requests_total').text(app.requests_total);
+		$('#requests_total').text(app.requests_total.toLocaleString());
 		$('#requests_since_launch').text(app.requests_since_launch);
 	},
 
