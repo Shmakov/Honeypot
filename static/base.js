@@ -96,6 +96,10 @@ const app = {
 		$('#recent_credential div:last').remove();
 	},
 
+	pauseLoadingSpinner: function() {
+		$('.loading-spinner').hide();
+	},
+
 	entityMap: {
 		'&': '&amp;',
 		'<': '&lt;',
@@ -140,9 +144,11 @@ socket.on('init', function(init_data) {
 	app.requests_total = init_data['total_requests_number'];
 	app.renderData(init_data['data']);
 	app.renderCredentials(init_data['recent_credentials']);
+	app.pauseLoadingSpinner();
 });
 socket.on('broadcast', function(data) {
 	app.renderRow(data);
+	app.pauseLoadingSpinner();
 });
 
 $(document).ready(function(){
