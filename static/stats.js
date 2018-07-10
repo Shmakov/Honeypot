@@ -88,7 +88,7 @@ const Stats = {
 		data.addColumn('number', '#');
 		for (let i = 0; i < Stats.data.requests.length; i++) {
 			let row = Stats.data.requests[i];
-			let request = row['request'].length > 64 ? row['request'].substring(0, 64) + '...' : row['request'];
+			let request = row['request'].length > 55 ? row['request'].substring(0, 55) + '...' : row['request'];
 			data.addRow([request, row['total']]);
 		}
 
