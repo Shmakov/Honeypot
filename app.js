@@ -146,7 +146,7 @@ app.use((req, res, next) => {
 });
 app.use(express.static('static'));
 app.get('/', (req, res) => {
-	res.sendFile('view/index.html' , { root : __dirname});
+	res.sendFile('view/index.html' , {root: __dirname, lastModified: false, headers: {'Cache-Control': 'no-cache, no-store, must-revalidate', 'Expires': '0'}});
 });
 app.get('/stats', (req, res) => {
 	res.render('stats', {data: monthly_stats})
