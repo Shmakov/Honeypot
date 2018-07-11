@@ -13,9 +13,9 @@ const app = {
 			event.preventDefault();
 			let fullTextTitle = $(this).parent().data('fullTextTitle');
 			let content = '';
-			if (fullTextTitle) content+= '<h1>' + fullTextTitle + '</h1>';
+			if (fullTextTitle) content+= '<h1>' + app.escapeHtml(fullTextTitle) + '</h1>';
 			content+= '<pre>';
-			content+= $(this).parent().data('fullText');
+			content+= app.escapeHtml($(this).parent().data('fullText'));
 			content+= '</pre>';
 			app.modal.setContent(content);
 			app.modal.open();
