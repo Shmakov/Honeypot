@@ -1,6 +1,13 @@
 "use strict";
 
-const config = require('./config');
+let config;
+try {
+	config = require('./config');
+} catch (err) {
+	console.log("Error: config not found. Please create `./config.js` based on the `./config.js.template`.");
+	return;
+}
+
 const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
