@@ -141,7 +141,7 @@ app.use((req, res, next) => {
 		'http_request_path': req.originalUrl,
 		'request_headers': helper.formatHeaders(req.headers)
 	};
-	if (req.hostname !== config.hostname || req.protocol === 'http') {
+	if (req.hostname !== config.hostname || (req.protocol === 'http' && config.https_only)) {
 		if (req.hostname) item.request = req.method + ' ' + req.protocol + '://' + req.hostname + req.originalUrl;
 		emitData(item);
 		res.redirect('https://' + config.hostname + req.originalUrl);
