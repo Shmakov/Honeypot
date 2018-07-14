@@ -1,6 +1,7 @@
 const config = {
 	server_ip: '35.230.121.210',
 	hostname: 'tail-f.shmakov.net', // Hostname or IP-address of the server
+	https_only: false,
 	mysql_connection_string: {
 		connectionLimit: 100,
 		host: 'localhost',
