@@ -1,11 +1,18 @@
 "use strict";
 
-const config = require('./config');
+let config;
+try {
+	config = require('./config');
+} catch (err) {
+	console.log("Error: config not found. Please create `./config.js` based on the `./config.js.template`.");
+	return;
+}
+
 const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
 const helmet = require('helmet');
-const server = require('http').createServer(app);
+const server = require('http').Server(app);
 const io = require('socket.io')(server);
 const ssh2 = require('ssh2');
 const fs = require('fs');
@@ -21,7 +28,7 @@ let monthly_stats;
 let total_requests_number = 0;
 let recent_credentials = null;
 
-/* WebSocket Server */
+/* Socket.io WebSocket Server: on connection */
 io.on('connection', (socket) => {
 	socket.emit('init', {
 		'data': data,
@@ -29,7 +36,6 @@ io.on('connection', (socket) => {
 		'recent_credentials': recent_credentials
 	});
 });
-server.listen(3000);
 
 /**
  * Custom Socket Server: listening on ~128 most common TCP ports
@@ -121,7 +127,7 @@ const ssh2_server = new ssh2.Server({
 });
 
 /* Express App */
-app.enable('trust proxy', 1);
+if (config.nginx_reverse_proxy) app.enable('trust proxy', 1);
 app.use(helmet());
 app.set('view engine', 'ejs');
 app.set('views', './view');
@@ -134,10 +140,10 @@ app.use((req, res, next) => {
 		'http_request_path': req.originalUrl,
 		'request_headers': helper.formatHeaders(req.headers)
 	};
-	if (req.hostname !== config.hostname || req.protocol === 'http') {
+	if (req.hostname !== config.hostname || (req.protocol === 'http' && config.https_only)) {
 		if (req.hostname) item.request = req.method + ' ' + req.protocol + '://' + req.hostname + req.originalUrl;
 		emitData(item);
-		res.redirect('https://' + config.hostname + req.originalUrl);
+		res.redirect((config.https_only ? 'https' : 'http') + '://' + config.hostname + req.originalUrl);
 	}
 	else {
 		emitData(item);
@@ -161,7 +167,7 @@ app.all('*', (req, res) => {
 		res.sendStatus(404);
 	}
 });
-app.listen(30101);
+server.listen(config.nginx_reverse_proxy === true ? config.express_js_alternative_port : 80);
 
 /**
  * Emits data to the WebSocket clients and also saves it in the MySQL database
