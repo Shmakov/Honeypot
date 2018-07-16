@@ -19,6 +19,7 @@ git clone https://github.com/Shmakov/Honeypot.git
 cd Honeypot/ && npm install
 sudo node app.js # Please think twice before running random person's code with the sudo privileges
 ```
+That is it. You should be able to access the app on the port 80 from your web-browser. 
 
 ## Monthly Statistics
 Stats for the past 30 days are available at https://tail-f.shmakov.net/stats
