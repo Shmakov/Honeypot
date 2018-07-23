@@ -108,14 +108,10 @@ server.listen(config.nginx_reverse_proxy === true ? config.express_js_alternativ
  */
 const emitData = (item) => {
 	total_requests_number++;
-
 	item.timestamp = Date.now();
-	if (item.ip && item.ip.substr(0, 7) === "::ffff:") item.ip = item.ip.substr(7);
-
+	item.ip = helper.formatIpAddress(item.ip);
 	io.emit('broadcast', item);
-
 	data[data.length] = item;
-
 	helper.saveToDatabase(item);
 };
 
