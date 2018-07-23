@@ -14,11 +14,8 @@ const bodyParser = require('body-parser');
 const helmet = require('helmet');
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
-const ssh2 = require('ssh2');
-const fs = require('fs');
 const escape = require('escape-html');
 const { spawn } = require('child_process');
-const FtpSrv = require('ftp-srv');
 const CustomSocketServer = require('./lib/custom-socket-server');
 const helper = require('./lib/helper');
 const tcp_ports = require('./lib/tcp-ports');
@@ -42,7 +39,9 @@ io.on('connection', (socket) => {
  * @see: ./lib/tcp-ports
  */
 for (let port in tcp_ports) {
-	(new CustomSocketServer(port, tcp_ports[port])).on('data', (data) => { emitData(data); });
+	(CustomSocketServer(port, tcp_ports[port])).on('data', (data) => {
+		emitData(data);
+	});
 }
 
 /* Catching ICMP echo requests (ping) using tcpdump */
@@ -62,59 +61,6 @@ tcpdumpProcess.stdout.on('data', (data) => {
 	}
 	catch (error) {}
 });
-
-/* FTP Server */
-const ftpServer = new FtpSrv('ftp://0.0.0.0:21', {
-	fs: require('./lib/custom-ftp-file-system'),
-	greeting: 'Hi There!',
-	anonymous: true,
-	log: require('bunyan').createLogger({level: 60, name: 'noname'})
-}).on('login', ({connection, username, password}, resolve, reject) => {
-	connection.close();
-	emitData({
-		'username': username,
-		'password': password,
-		'ip': connection.ip,
-		'service': 'ftp',
-		'request': 'ftp://' + username + ':' + password + '@' + config.server_ip + ':21'
-	});
-}).listen();
-
-/* SSH2 Server */
-const ssh2_server = new ssh2.Server({
-	hostKeys: [fs.readFileSync('etc/ssh2.private.key')],
-	banner: 'Hi there!',
-	ident: 'OpenSSH_7.6'
-}, (client) => {
-	client.on('authentication', (ctx) => {
-		if (ctx.method !== 'password') return ctx.reject(['password']);
-		if (ctx.method === 'password') {
-			if (client._client_info) {
-				emitData({
-					'username': ctx.username,
-					'password': ctx.password,
-					'ip': client._client_info.ip,
-					'service': 'ssh',
-					'request': (ctx.username && ctx.username.length !== '') ? 'ssh ' + ctx.username + '@' + config.server_ip + ':22' : 'ssh ' + config.server_ip + ':22',
-					'request_headers': helper.formatHeaders(client._client_info.header)
-				});
-			}
-			ctx.accept();
-			client.end();
-		}
-		else {
-			// if no signature present, that means the client is just checking
-			// the validity of the given public key
-			ctx.accept();
-		}
-	}).on('ready', () => {
-		client.end();
-	}).on('error', () => {
-		client.end();
-	});
-}).on('connection', (client, info) => {
-	client._client_info = info;
-}).listen(22);
 
 /* MySQL Helper */
 (new helper.Mysql()).on('total_requests_number', (count) => {
