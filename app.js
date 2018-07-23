@@ -15,8 +15,8 @@ const helmet = require('helmet');
 const server = require('http').Server(app);
 const io = require('socket.io')(server);
 const escape = require('escape-html');
-const { spawn } = require('child_process');
 const CustomSocketServer = require('./lib/custom-socket-server');
+const IcmpEchoLogger = require('./lib/icmp-echo-logger');
 const helper = require('./lib/helper');
 const tcp_ports = require('./lib/tcp-ports');
 
@@ -45,21 +45,8 @@ for (let port in tcp_ports) {
 }
 
 /* Catching ICMP echo requests (ping) using tcpdump */
-let cmd = 'tcpdump';
-let args = ['-nvvv', '-l', '-i', 'eth0', 'icmp', 'and', 'icmp[icmptype]=icmp-echo'];
-const tcpdumpProcess = spawn(cmd, args, {stdio: ['ignore', 'pipe', 'ignore']});
-tcpdumpProcess.stdout.on('data', (data) => {
-	try {
-		let echo_request = data.toString();
-		let echo_request_ip = echo_request.split("\n")[1].split(">")[0].trim();
-		emitData({
-			'ip': echo_request_ip,
-			'service': 'ping',
-			'request': 'ICMP echo request from ' + echo_request_ip,
-			'request_headers': echo_request
-		});
-	}
-	catch (error) {}
+const ping = new IcmpEchoLogger().on('data', (data) => {
+	emitData(data);
 });
 
 /* MySQL Helper */
@@ -144,13 +131,15 @@ setInterval(() => {
 	}
 }, 2000);
 
-/* Restart/Kill Signal from supervisor */
-process.on('SIGTERM', () => {
+/* We need to manually kill tcpdump process in the case of program termination signal */
+const terminate = () => {
 	try {
-		tcpdumpProcess.kill();
-	}catch (error) {}
+		ping.tcpdumpProcess.kill();
+	} catch (error) {}
 
 	server.close(() => {
 		process.exit(0);
 	});
-});
+};
+process.on('SIGTERM', terminate);
+process.on('SIGINT', terminate);
