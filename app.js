@@ -1,10 +1,11 @@
 "use strict";
 
+const chalk = require('chalk');
 let config;
 try {
 	config = require('./config');
 } catch (err) {
-	console.log("Error: config not found. Please create `./config.js` based on the `./config.js.template`.");
+	console.error(chalk.bgRed.bold('Error:') + ' config not found. Please create `./config.js` based on the `./config.js.template`.');
 	return;
 }
 
@@ -102,7 +103,7 @@ app.all('*', (req, res) => {
 });
 const server_port = config.nginx_reverse_proxy === true ? config.express_js_alternative_port : 80;
 server.listen(server_port);
-console.log(`Server running at http://${config.server_ip}:${server_port}/`);
+console.log(chalk.green.bold(`Server running at http://${config.server_ip}:${server_port}/`));
 
 /**
  * Emits data to the WebSocket clients and also saves it in the MySQL database
