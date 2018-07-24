@@ -100,7 +100,9 @@ app.all('*', (req, res) => {
 		res.sendStatus(404);
 	}
 });
-server.listen(config.nginx_reverse_proxy === true ? config.express_js_alternative_port : 80);
+const server_port = config.nginx_reverse_proxy === true ? config.express_js_alternative_port : 80;
+server.listen(server_port);
+console.log(`Server running at http://${config.server_ip}:${server_port}/`);
 
 /**
  * Emits data to the WebSocket clients and also saves it in the MySQL database
