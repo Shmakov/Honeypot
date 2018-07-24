@@ -21,7 +21,7 @@ const IcmpEchoLogger = require('./lib/icmp-echo-logger');
 const helper = require('./lib/helper');
 const tcp_ports = require('./lib/tcp-ports');
 
-const data = [];
+let data = [];
 let monthly_stats;
 let total_requests_number = 0;
 let recent_credentials = null;
@@ -120,15 +120,8 @@ const emitData = (item) => {
 
 /* Cleaning Up Old Data */
 setInterval(() => {
-	if (!data.length) return;
-
-	for (let i = data.length - 1; i >= 0; i -= 1) {
-		let item = data[i];
-		if (Date.now() - item.timestamp > 2000) {
-			data.splice(i, 1);
-		}
-	}
-}, 2000);
+	data = helper.removeOldData(data);
+}, 1000);
 
 /* We need to manually kill tcpdump process in the case of program termination signal */
 const terminate = () => {
