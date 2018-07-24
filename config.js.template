@@ -1,6 +1,6 @@
 const config = {
 	// Please specify server's IP address. Express.js App and all the TCP ports will be listening on this IP Address
-	server_ip: '35.230.121.210',
+	server_ip: '127.0.0.1',
 	// Hostname of the server, e.g. tail-f.shmakov.net
 	hostname: '',
 	// Set to true if you would like to serve only HTTPS traffic. Requires configuring Nginx as a Reverse Proxy
