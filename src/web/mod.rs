@@ -5,8 +5,9 @@ mod sse;
 
 use anyhow::Result;
 use axum::{
+    body::Bytes,
     extract::{ConnectInfo, Request, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{any, get},
     Router,
@@ -26,9 +27,30 @@ pub struct AppState {
     pub geoip: SharedGeoIp,
 }
 
+/// Format HTTP headers as a readable string
+fn format_headers(headers: &HeaderMap) -> String {
+    headers
+        .iter()
+        .map(|(name, value)| {
+            format!("{}: {}", name.as_str(), value.to_str().unwrap_or("<binary>"))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Log an HTTP request as an attack event
-async fn log_http_event(state: &AppState, ip: String, method: &str, uri: &str) {
-    let request_str = format!("{} {}", method, uri);
+async fn log_http_event(
+    state: &AppState,
+    ip: String,
+    method: &str,
+    uri: &str,
+    headers: &HeaderMap,
+    body: Option<Bytes>,
+) {
+    // Format request with method, path, and headers
+    let headers_str = format_headers(headers);
+    let request_str = format!("{} {}\n{}", method, uri, headers_str);
+    
     let mut event = AttackEvent::new(
         ip.clone(),
         "http".to_string(),
@@ -36,6 +58,13 @@ async fn log_http_event(state: &AppState, ip: String, method: &str, uri: &str) {
         request_str,
     );
     event.http_path = Some(uri.to_string());
+    
+    // Store body as payload if present
+    if let Some(body_bytes) = body {
+        if !body_bytes.is_empty() {
+            event = event.with_payload(body_bytes.to_vec());
+        }
+    }
     
     // Add GeoIP info
     if let Some(loc) = state.geoip.lookup(&ip) {
@@ -54,9 +83,10 @@ async fn log_http_event(state: &AppState, ip: String, method: &str, uri: &str) {
 async fn index_with_log(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
     let ip = addr.ip().to_string();
-    log_http_event(&state, ip, "GET", "/").await;
+    log_http_event(&state, ip, "GET", "/", &headers, None).await;
     routes::index().await
 }
 
@@ -64,13 +94,14 @@ async fn index_with_log(
 async fn stats_with_log(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
     let ip = addr.ip().to_string();
-    log_http_event(&state, ip, "GET", "/stats").await;
+    log_http_event(&state, ip, "GET", "/stats", &headers, None).await;
     routes::stats_page().await
 }
 
-/// Handler for all unknown paths - log as attack and return fake response
+/// Handler for all unknown paths - log as attack with full headers and body
 async fn catch_all(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -79,8 +110,20 @@ async fn catch_all(
     let method = request.method().to_string();
     let uri = request.uri().to_string();
     let ip = addr.ip().to_string();
+    let headers = request.headers().clone();
     
-    log_http_event(&state, ip, &method, &uri).await;
+    // Extract body for POST/PUT/PATCH requests
+    let body = if method == "POST" || method == "PUT" || method == "PATCH" {
+        // Collect the body
+        match axum::body::to_bytes(request.into_body(), 64 * 1024).await {
+            Ok(bytes) => Some(bytes),
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+    
+    log_http_event(&state, ip, &method, &uri, &headers, body).await;
     
     // Return a plausible 404 response
     (StatusCode::NOT_FOUND, "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL was not found on this server.</p></body></html>")
