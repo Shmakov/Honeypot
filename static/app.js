@@ -340,27 +340,39 @@ function initAttackMap() {
     const mapElement = document.getElementById('attackMap');
     if (!mapElement || attackMap) return;
 
-    // Initialize map centered on world
-    attackMap = L.map('attackMap', {
-        center: [30, 0],
-        zoom: 2,
-        minZoom: 1,
-        maxZoom: 6,
-        zoomControl: true,
-        attributionControl: false
-    });
+    try {
+        // Initialize map centered on world
+        attackMap = L.map('attackMap', {
+            center: [30, 0],
+            zoom: 2,
+            minZoom: 1,
+            maxZoom: 6,
+            zoomControl: true,
+            attributionControl: false
+        });
 
-    // Dark theme tiles (CartoDB Dark Matter - free)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        subdomains: 'abcd',
-        maxZoom: 19
-    }).addTo(attackMap);
+        // Dark theme tiles (CartoDB Dark Matter - free)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(attackMap);
 
-    // Add subtle attribution
-    L.control.attribution({
-        position: 'bottomright',
-        prefix: false
-    }).addAttribution('© <a href="https://carto.com/">CARTO</a>').addTo(attackMap);
+        // Add subtle attribution
+        L.control.attribution({
+            position: 'bottomright',
+            prefix: false
+        }).addAttribution('© <a href="https://carto.com/">CARTO</a>').addTo(attackMap);
+
+        // Force map to recalculate size after a short delay
+        setTimeout(() => {
+            if (attackMap) {
+                attackMap.invalidateSize();
+            }
+        }, 100);
+
+    } catch (e) {
+        console.error('Failed to initialize map:', e);
+    }
 }
 
 // Add an attack dot to the map
