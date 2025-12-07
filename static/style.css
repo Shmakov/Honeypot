@@ -8,17 +8,17 @@
     --bg-card: rgba(17, 24, 39, 0.8);
     --glass-bg: rgba(255, 255, 255, 0.05);
     --glass-border: rgba(255, 255, 255, 0.1);
-    
+
     --text-primary: #f9fafb;
     --text-secondary: #9ca3af;
     --text-muted: #6b7280;
-    
+
     --accent-primary: #3b82f6;
     --accent-secondary: #8b5cf6;
     --accent-success: #10b981;
     --accent-warning: #f59e0b;
     --accent-danger: #ef4444;
-    
+
     /* Service colors */
     --color-ssh: #ef4444;
     --color-ftp: #f59e0b;
@@ -26,20 +26,20 @@
     --color-http: #3b82f6;
     --color-mysql: #06b6d4;
     --color-other: #6b7280;
-    
+
     /* Spacing */
     --space-xs: 0.25rem;
     --space-sm: 0.5rem;
     --space-md: 1rem;
     --space-lg: 1.5rem;
     --space-xl: 2rem;
-    
+
     /* Border radius */
     --radius-sm: 0.375rem;
     --radius-md: 0.5rem;
     --radius-lg: 0.75rem;
     --radius-xl: 1rem;
-    
+
     /* Fonts */
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
@@ -51,7 +51,8 @@
     box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
     height: 100%;
     font-family: var(--font-sans);
     background: var(--bg-primary);
@@ -60,7 +61,7 @@ html, body {
 }
 
 body {
-    background: 
+    background:
         radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
         radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
         var(--bg-primary);
@@ -156,8 +157,15 @@ body {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
 /* Main Content */
@@ -269,6 +277,7 @@ body {
         transform: translate(-50%, -50%) scale(1);
         opacity: 1;
     }
+
     100% {
         transform: translate(-50%, -50%) scale(3);
         opacity: 0;
@@ -358,6 +367,7 @@ body {
         opacity: 0;
         transform: translateY(-10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -389,12 +399,35 @@ body {
     text-transform: uppercase;
 }
 
-.service-ssh { background: rgba(239, 68, 68, 0.2); color: var(--color-ssh); }
-.service-ftp { background: rgba(245, 158, 11, 0.2); color: var(--color-ftp); }
-.service-telnet { background: rgba(139, 92, 246, 0.2); color: var(--color-telnet); }
-.service-http { background: rgba(59, 130, 246, 0.2); color: var(--color-http); }
-.service-mysql { background: rgba(6, 182, 212, 0.2); color: var(--color-mysql); }
-.service-default { background: rgba(107, 114, 128, 0.2); color: var(--color-other); }
+.service-ssh {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--color-ssh);
+}
+
+.service-ftp {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--color-ftp);
+}
+
+.service-telnet {
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--color-telnet);
+}
+
+.service-http {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--color-http);
+}
+
+.service-mysql {
+    background: rgba(6, 182, 212, 0.2);
+    color: var(--color-mysql);
+}
+
+.service-default {
+    background: rgba(107, 114, 128, 0.2);
+    color: var(--color-other);
+}
 
 .request-cell {
     max-width: 400px;
@@ -465,6 +498,7 @@ body {
 
 .detail-label {
     color: var(--text-muted);
+    font-weight: 500;
 }
 
 .detail-value {
@@ -472,10 +506,21 @@ body {
     color: var(--text-primary);
 }
 
+.credentials-highlight {
+    color: var(--accent-warning);
+    font-weight: 600;
+}
+
+.detail-grid {
+    margin-bottom: var(--space-lg);
+}
+
+.request-section,
 .payload-section {
     margin-top: var(--space-lg);
 }
 
+.request-content,
 .payload-content {
     margin-top: var(--space-sm);
     background: rgba(0, 0, 0, 0.3);
@@ -483,12 +528,19 @@ body {
     padding: var(--space-md);
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    color: var(--accent-success);
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-all;
     max-height: 200px;
     overflow-y: auto;
+}
+
+.request-content {
+    color: var(--accent-info);
+}
+
+.payload-content {
+    color: var(--accent-success);
 }
 
 /* Stats Page */
@@ -577,30 +629,31 @@ body {
         flex-wrap: wrap;
         gap: var(--space-md);
     }
-    
+
     .nav {
         order: 3;
         width: 100%;
         justify-content: center;
     }
-    
+
     .main {
         padding: var(--space-md);
     }
-    
+
     .stats-cards {
         grid-template-columns: 1fr;
     }
-    
+
     .feed-table {
         font-size: 0.75rem;
     }
-    
+
     .request-cell {
         max-width: 150px;
     }
-    
-    .charts-row, .tables-row {
+
+    .charts-row,
+    .tables-row {
         grid-template-columns: 1fr;
     }
 }

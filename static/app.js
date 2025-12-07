@@ -174,21 +174,53 @@ class HoneypotDashboard {
             credRow.style.display = 'none';
         }
 
-        // Payload
+        // Request (contains method, path, headers)
+        const requestEl = document.getElementById('detailRequest');
+        if (event.request) {
+            requestEl.textContent = event.request;
+        } else {
+            requestEl.textContent = 'No request data';
+        }
+
+        // Payload (hex-encoded body)
+        const payloadSection = document.getElementById('payloadSection');
         const payloadEl = document.getElementById('detailPayload');
         if (event.payload) {
+            payloadSection.style.display = 'block';
             try {
-                // Try to decode base64 and display
-                const decoded = atob(event.payload);
+                // Decode hex to string
+                const decoded = this.hexDecode(event.payload);
                 payloadEl.textContent = decoded;
             } catch {
+                // If hex decode fails, show as-is
                 payloadEl.textContent = event.payload;
             }
         } else {
-            payloadEl.textContent = 'No payload captured';
+            payloadSection.style.display = 'none';
         }
 
         this.modalOverlay.classList.add('active');
+    }
+
+    // Decode hex string to text
+    hexDecode(hex) {
+        let str = '';
+        for (let i = 0; i < hex.length; i += 2) {
+            const byte = parseInt(hex.substr(i, 2), 16);
+            // Replace non-printable chars with dots
+            if (byte >= 32 && byte < 127) {
+                str += String.fromCharCode(byte);
+            } else if (byte === 10) {
+                str += '\n';
+            } else if (byte === 13) {
+                str += '\r';
+            } else if (byte === 9) {
+                str += '\t';
+            } else {
+                str += '.';
+            }
+        }
+        return str;
     }
 
     hideModal() {
