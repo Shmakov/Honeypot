@@ -58,10 +58,14 @@ class HoneypotDashboard {
     connectSSE() {
         this.updateConnectionStatus('connecting');
 
+        // Reset retry count on connect attempt
+        if (!this.retryCount) this.retryCount = 0;
+
         this.eventSource = new EventSource('/events');
 
         this.eventSource.onopen = () => {
             this.updateConnectionStatus('connected');
+            this.retryCount = 0; // Reset on successful connection
         };
 
         this.eventSource.addEventListener('attack', (event) => {
@@ -73,8 +77,14 @@ class HoneypotDashboard {
 
         this.eventSource.onerror = () => {
             this.updateConnectionStatus('error');
-            // Reconnect after 5 seconds
-            setTimeout(() => this.connectSSE(), 5000);
+            this.eventSource.close(); // Explicitly close to prevent browser retries
+
+            // Exponential backoff: 5s, 10s, 20s, 40s... max 60s
+            this.retryCount = (this.retryCount || 0) + 1;
+            const delay = Math.min(5000 * Math.pow(2, this.retryCount - 1), 60000);
+
+            console.log(`Connection failed. Retrying in ${delay / 1000}s (attempt ${this.retryCount})`);
+            setTimeout(() => this.connectSSE(), delay);
         };
     }
 
