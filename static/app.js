@@ -117,12 +117,15 @@ class HoneypotDashboard {
         const service = event.service || 'unknown';
         const serviceClass = this.getServiceClass(service);
 
+        // Show only first line of request (e.g., "GET /path") not headers
+        const requestFirstLine = (event.request || '').split('\n')[0];
+
         row.innerHTML = `
             <td class="time-cell">${time}</td>
             <td class="ip-cell">${this.escapeHtml(event.ip)}</td>
             <td class="country-cell">${event.country_code || '-'}</td>
             <td><span class="service-badge ${serviceClass}">${service}</span></td>
-            <td class="request-cell" title="${this.escapeHtml(event.request || '')}">${this.escapeHtml(this.truncate(event.request || '', 60))}</td>
+            <td class="request-cell" title="${this.escapeHtml(requestFirstLine)}">${this.escapeHtml(this.truncate(requestFirstLine, 50))}</td>
         `;
 
         row.addEventListener('click', () => this.showEventDetails(event));
