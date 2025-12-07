@@ -22,16 +22,28 @@
     function setTheme(theme) {
         if (theme === 'light') {
             document.documentElement.setAttribute('data-theme', 'light');
+            document.body.classList.add('light');
+            document.body.classList.remove('dark');
             if (themeToggle) themeToggle.textContent = '☀️';
         } else {
             document.documentElement.removeAttribute('data-theme');
+            document.body.classList.remove('light');
+            document.body.classList.add('dark');
             if (themeToggle) themeToggle.textContent = '🌙';
+        }
+
+        // Update map tiles if map exists
+        if (window.updateMapTheme) {
+            window.updateMapTheme(theme);
         }
     }
 
     // Initialize
     const currentTheme = getPreferredTheme();
     setTheme(currentTheme);
+
+    // Store for map to access
+    window.currentTheme = currentTheme;
 
     // Toggle handler
     if (themeToggle) {
@@ -40,6 +52,7 @@
             const newTheme = current === 'light' ? 'dark' : 'light';
             setTheme(newTheme);
             localStorage.setItem('theme', newTheme);
+            window.currentTheme = newTheme;
         });
     }
 
@@ -47,7 +60,9 @@
     window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
         // Only auto-switch if user hasn't set a preference
         if (!localStorage.getItem('theme')) {
-            setTheme(e.matches ? 'light' : 'dark');
+            const newTheme = e.matches ? 'light' : 'dark';
+            setTheme(newTheme);
+            window.currentTheme = newTheme;
         }
     });
 })();

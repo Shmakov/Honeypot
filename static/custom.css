@@ -1,0 +1,266 @@
+/* Custom CSS for animations and Leaflet overrides */
+/* Tailwind handles most styling, this is for extras */
+
+/* Modal transitions */
+.modal-overlay.active {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.modal-overlay.active .modal {
+    transform: scale(1) !important;
+}
+
+/* Table row animation */
+.new-row {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Table row hover */
+#feedBody tr {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+#feedBody tr:hover {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Connection status dot */
+.status-dot.connected {
+    background-color: #10b981 !important;
+    animation: none !important;
+}
+
+.status-dot.error {
+    background-color: #ef4444 !important;
+}
+
+/* Attack map - Leaflet overrides */
+#attackMap {
+    height: 320px !important;
+    background: #1a1a2e !important;
+}
+
+.leaflet-container {
+    background: #1a1a2e !important;
+    font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+    background: #1f2937;
+    color: #f9fafb;
+    border-radius: 0.75rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.leaflet-popup-tip {
+    background: #1f2937;
+}
+
+.leaflet-popup-content {
+    margin: 12px 16px;
+}
+
+/* Attack markers */
+.attack-marker {
+    position: relative;
+}
+
+.attack-dot {
+    width: 12px;
+    height: 12px;
+    background: #ef4444;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 12px #ef4444, 0 0 24px rgba(239, 68, 68, 0.5);
+    z-index: 2;
+}
+
+.attack-pulse {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #ef4444;
+    opacity: 0.4;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulseRing 1.5s ease-out infinite;
+    z-index: 1;
+}
+
+@keyframes pulseRing {
+    0% {
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0.6;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(2.5);
+        opacity: 0;
+    }
+}
+
+/* Service badges */
+.service-ssh {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+}
+
+.service-ftp {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fcd34d;
+}
+
+.service-telnet {
+    background-color: rgba(139, 92, 246, 0.2);
+    color: #c4b5fd;
+}
+
+.service-http {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+}
+
+.service-mysql {
+    background-color: rgba(6, 182, 212, 0.2);
+    color: #67e8f9;
+}
+
+.service-default {
+    background-color: rgba(107, 114, 128, 0.2);
+    color: #9ca3af;
+}
+
+/* Light theme overrides */
+[data-theme="light"] body,
+.light body {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] header,
+.light header {
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .bg-gray-900\/50,
+.light .bg-gray-900\/50 {
+    background-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+[data-theme="light"] .bg-gray-900,
+.light .bg-gray-900 {
+    background-color: #ffffff !important;
+}
+
+[data-theme="light"] .bg-gray-800,
+.light .bg-gray-800 {
+    background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] .bg-gray-800\/50,
+.light .bg-gray-800\/50 {
+    background-color: rgba(241, 245, 249, 0.8) !important;
+}
+
+[data-theme="light"] .border-gray-800,
+.light .border-gray-800 {
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .border-gray-700,
+.light .border-gray-700 {
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .text-white,
+.light .text-white {
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .text-gray-100,
+.light .text-gray-100 {
+    color: #334155 !important;
+}
+
+[data-theme="light"] .text-gray-400,
+.light .text-gray-400 {
+    color: #64748b !important;
+}
+
+[data-theme="light"] .text-gray-500,
+.light .text-gray-500 {
+    color: #64748b !important;
+}
+
+[data-theme="light"] .divide-gray-800> :not([hidden])~ :not([hidden]),
+.light .divide-gray-800> :not([hidden])~ :not([hidden]) {
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .bg-gray-950,
+.light .bg-gray-950 {
+    background-color: #f1f5f9 !important;
+}
+
+[data-theme="light"] #feedBody tr:hover,
+.light #feedBody tr:hover {
+    background-color: rgba(59, 130, 246, 0.08) !important;
+}
+
+[data-theme="light"] .leaflet-popup-content-wrapper,
+.light .leaflet-popup-content-wrapper {
+    background: #ffffff !important;
+    color: #1e293b !important;
+}
+
+[data-theme="light"] .leaflet-popup-tip,
+.light .leaflet-popup-tip {
+    background: #ffffff !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4b5563;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}

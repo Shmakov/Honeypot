@@ -5,131 +5,184 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Honeypot Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Custom styles for animations and Leaflet -->
+    <link rel="stylesheet" href="/static/custom.css">
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
 </head>
 
-<body>
-    <div class="app">
+<body class="bg-gray-950 text-gray-100 dark:bg-gray-950 dark:text-gray-100 font-sans min-h-screen">
+    <!-- Light theme classes -->
+    <div id="app" class="min-h-screen">
+
         <!-- Header -->
-        <header class="header">
-            <div class="logo">
-                <span class="logo-icon">🍯</span>
-                <span class="logo-text">Honeypot</span>
-            </div>
-            <nav class="nav">
-                <a href="/" class="nav-link active">Live Feed</a>
-                <a href="/stats" class="nav-link">Statistics</a>
-            </nav>
-            <div class="header-actions">
-                <button class="btn-icon theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
-                <div class="connection-status" id="connectionStatus">
-                    <span class="status-dot"></span>
-                    <span class="status-text">Connecting...</span>
+        <header class="sticky top-0 z-50 backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🍯</span>
+                        <span
+                            class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Honeypot</span>
+                    </div>
+
+                    <!-- Navigation -->
+                    <nav class="flex items-center gap-1">
+                        <a href="/"
+                            class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Live
+                            Feed</a>
+                        <a href="/stats"
+                            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Statistics</a>
+                    </nav>
+
+                    <!-- Header Actions -->
+                    <div class="flex items-center gap-4">
+                        <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl"
+                            title="Toggle theme">🌙</button>
+                        <div id="connectionStatus" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-800">
+                            <span class="status-dot w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                            <span class="status-text text-xs text-gray-400">Connecting...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </header>
 
-        <main class="main">
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
             <!-- Stats Cards -->
-            <div class="stats-cards">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalRequests">-</div>
-                    <div class="stat-label">Total Requests</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div id="totalRequests" class="text-3xl font-bold text-white">-</div>
+                    <div class="text-sm text-gray-500 mt-1">Total Requests</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="sessionRequests">0</div>
-                    <div class="stat-label">This Session</div>
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div id="sessionRequests" class="text-3xl font-bold text-white">0</div>
+                    <div class="text-sm text-gray-500 mt-1">This Session</div>
                 </div>
-                <div class="stat-card credentials-card">
-                    <div class="stat-label">Recent Credentials</div>
-                    <div class="credentials-list" id="recentCredentials">
-                        <div class="credential-item">-</div>
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div class="text-sm text-gray-500 mb-2">Recent Credentials</div>
+                    <div id="recentCredentials" class="space-y-1 font-mono text-sm">
+                        <div class="text-gray-600">-</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Live Feed (moved higher) -->
-            <div class="feed-container glass-card">
-                <div class="feed-header">
-                    <h3>Live Attack Feed</h3>
-                    <div class="feed-controls">
-                        <button class="btn-icon" id="pauseBtn" title="Pause">⏸</button>
-                        <button class="btn-icon" id="clearBtn" title="Clear">🗑</button>
+            <!-- Live Feed -->
+            <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+                    <h3 class="text-lg font-semibold text-white">Live Attack Feed</h3>
+                    <div class="flex items-center gap-2">
+                        <button id="pauseBtn"
+                            class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+                            title="Pause">⏸</button>
+                        <button id="clearBtn"
+                            class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+                            title="Clear">🗑</button>
                     </div>
                 </div>
-                <div class="feed-table-wrapper">
-                    <table class="feed-table">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>IP</th>
-                                <th>Country</th>
-                                <th>Service</th>
-                                <th>Request</th>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-800/50">
+                            <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                <th class="px-6 py-3">Time</th>
+                                <th class="px-6 py-3">IP</th>
+                                <th class="px-6 py-3">Country</th>
+                                <th class="px-6 py-3">Service</th>
+                                <th class="px-6 py-3">Request</th>
                             </tr>
                         </thead>
-                        <tbody id="feedBody">
-                            <!-- Attack rows will be inserted here -->
+                        <tbody id="feedBody" class="divide-y divide-gray-800">
+                            <!-- Attack rows inserted here -->
                         </tbody>
                     </table>
                 </div>
             </div>
 
             <!-- Attack Map -->
-            <div class="map-container glass-card">
-                <h3>Live Attack Map</h3>
-                <div class="world-map" id="attackMap"></div>
+            <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-800">
+                    <h3 class="text-lg font-semibold text-white">Live Attack Map</h3>
+                </div>
+                <div id="attackMap" class="h-80"></div>
             </div>
         </main>
 
         <!-- Payload Modal -->
-        <div class="modal-overlay" id="modalOverlay">
-            <div class="modal glass-card">
-                <div class="modal-header">
-                    <h3 id="modalTitle">Request Details</h3>
-                    <button class="btn-icon modal-close" id="modalClose">✕</button>
+        <div id="modalOverlay"
+            class="modal-overlay fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 invisible transition-all duration-300">
+            <div
+                class="modal bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto m-4 transform scale-95 transition-transform duration-300">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+                    <h3 class="text-lg font-semibold text-white">Request Details</h3>
+                    <button id="modalClose"
+                        class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white">✕</button>
                 </div>
-                <div class="modal-body">
-                    <div class="detail-grid">
-                        <div class="detail-row">
-                            <span class="detail-label">IP Address:</span>
-                            <span class="detail-value" id="detailIp">-</span>
+                <div class="p-6 space-y-4">
+                    <!-- Details Grid -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-xs text-gray-500 uppercase">IP Address</div>
+                            <div id="detailIp" class="font-mono text-white">-</div>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Country:</span>
-                            <span class="detail-value" id="detailCountry">-</span>
+                        <div>
+                            <div class="text-xs text-gray-500 uppercase">Country</div>
+                            <div id="detailCountry" class="text-white">-</div>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Service:</span>
-                            <span class="detail-value" id="detailService">-</span>
+                        <div>
+                            <div class="text-xs text-gray-500 uppercase">Service</div>
+                            <div id="detailService" class="text-white">-</div>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Port:</span>
-                            <span class="detail-value" id="detailPort">-</span>
+                        <div>
+                            <div class="text-xs text-gray-500 uppercase">Port</div>
+                            <div id="detailPort" class="font-mono text-white">-</div>
                         </div>
-                        <div class="detail-row">
-                            <span class="detail-label">Timestamp:</span>
-                            <span class="detail-value" id="detailTime">-</span>
+                        <div class="col-span-2">
+                            <div class="text-xs text-gray-500 uppercase">Timestamp</div>
+                            <div id="detailTime" class="text-white">-</div>
                         </div>
-                        <div class="detail-row" id="credentialsRow" style="display: none;">
-                            <span class="detail-label">Credentials:</span>
-                            <span class="detail-value credentials-highlight" id="detailCredentials">-</span>
+                        <div id="credentialsRow" class="col-span-2 hidden">
+                            <div class="text-xs text-gray-500 uppercase">Credentials</div>
+                            <div id="detailCredentials" class="font-mono text-amber-400 font-semibold">-</div>
                         </div>
                     </div>
 
-                    <div class="request-section">
-                        <span class="detail-label">Request / Headers:</span>
-                        <pre class="request-content" id="detailRequest">No request data</pre>
+                    <!-- Request/Headers -->
+                    <div>
+                        <div class="text-xs text-gray-500 uppercase mb-2">Request / Headers</div>
+                        <pre id="detailRequest"
+                            class="bg-gray-950 rounded-lg p-4 text-sm font-mono text-cyan-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">No request data</pre>
                     </div>
 
-                    <div class="payload-section" id="payloadSection" style="display: none;">
-                        <span class="detail-label">Body / Payload:</span>
-                        <pre class="payload-content" id="detailPayload">No payload</pre>
+                    <!-- Payload -->
+                    <div id="payloadSection" class="hidden">
+                        <div class="text-xs text-gray-500 uppercase mb-2">Body / Payload</div>
+                        <pre id="detailPayload"
+                            class="bg-gray-950 rounded-lg p-4 text-sm font-mono text-green-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">No payload</pre>
                     </div>
                 </div>
             </div>

@@ -121,11 +121,11 @@ class HoneypotDashboard {
         const requestFirstLine = (event.request || '').split('\n')[0];
 
         row.innerHTML = `
-            <td class="time-cell">${time}</td>
-            <td class="ip-cell">${this.escapeHtml(event.ip)}</td>
-            <td class="country-cell">${event.country_code || '-'}</td>
-            <td><span class="service-badge ${serviceClass}">${service}</span></td>
-            <td class="request-cell" title="${this.escapeHtml(requestFirstLine)}">${this.escapeHtml(this.truncate(requestFirstLine, 50))}</td>
+            <td class="px-6 py-3 text-sm text-gray-400">${time}</td>
+            <td class="px-6 py-3 font-mono text-sm text-gray-300">${this.escapeHtml(event.ip)}</td>
+            <td class="px-6 py-3 text-sm text-gray-400">${event.country_code || '-'}</td>
+            <td class="px-6 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${serviceClass}">${service}</span></td>
+            <td class="px-6 py-3 text-sm text-gray-400 font-mono truncate max-w-xs" title="${this.escapeHtml(requestFirstLine)}">${this.escapeHtml(this.truncate(requestFirstLine, 50))}</td>
         `;
 
         row.addEventListener('click', () => this.showEventDetails(event));
@@ -337,7 +337,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // Attack Map using Leaflet.js
 let attackMap = null;
 let attackMarkers = [];
+let currentTileLayer = null;
 const MAX_MARKERS = 50;
+
+// Tile URLs for different themes
+const TILE_URLS = {
+    dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+};
 
 function initAttackMap() {
     const mapElement = document.getElementById('attackMap');
@@ -346,16 +353,17 @@ function initAttackMap() {
     try {
         // Initialize map centered on world
         attackMap = L.map('attackMap', {
-            center: [30, 0],
+            center: [25, 0],
             zoom: 2,
             minZoom: 1,
-            maxZoom: 6,
+            maxZoom: 8,
             zoomControl: true,
             attributionControl: false
         });
 
-        // Dark theme tiles (CartoDB Dark Matter - free)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        // Use theme-appropriate tiles
+        const theme = window.currentTheme || 'dark';
+        currentTileLayer = L.tileLayer(TILE_URLS[theme], {
             subdomains: 'abcd',
             maxZoom: 19
         }).addTo(attackMap);
@@ -364,7 +372,7 @@ function initAttackMap() {
         L.control.attribution({
             position: 'bottomright',
             prefix: false
-        }).addAttribution('© <a href="https://carto.com/">CARTO</a>').addTo(attackMap);
+        }).addAttribution('© <a href="https://carto.com/" style="color:#888">CARTO</a>').addTo(attackMap);
 
         // Force map to recalculate size after a short delay
         setTimeout(() => {
@@ -378,6 +386,17 @@ function initAttackMap() {
     }
 }
 
+// Update map tiles when theme changes
+window.updateMapTheme = function (theme) {
+    if (!attackMap || !currentTileLayer) return;
+
+    attackMap.removeLayer(currentTileLayer);
+    currentTileLayer = L.tileLayer(TILE_URLS[theme] || TILE_URLS.dark, {
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(attackMap);
+};
+
 // Add an attack dot to the map
 function addAttackDot(lat, lon, ip, service) {
     if (!attackMap) return;
@@ -386,12 +405,12 @@ function addAttackDot(lat, lon, ip, service) {
     const attackIcon = L.divIcon({
         className: 'attack-marker',
         html: `<div class="attack-pulse"></div><div class="attack-dot" data-service="${service}"></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
     });
 
     const marker = L.marker([lat, lon], { icon: attackIcon })
-        .bindPopup(`<b>${ip}</b><br>${service}`)
+        .bindPopup(`<div style="font-family: inherit"><strong>${ip}</strong><br><span style="color: #888">${service}</span></div>`)
         .addTo(attackMap);
 
     attackMarkers.push(marker);
@@ -416,3 +435,4 @@ function addAttackDot(lat, lon, ip, service) {
 window.addAttackDot = addAttackDot;
 
 document.addEventListener('DOMContentLoaded', initAttackMap);
+

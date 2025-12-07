@@ -5,106 +5,150 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Statistics - Honeypot</title>
-    <link rel="stylesheet" href="/static/style.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="/static/custom.css">
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body>
-    <div class="app">
+<body class="bg-gray-950 text-gray-100 font-sans min-h-screen">
+    <div id="app" class="min-h-screen">
+
         <!-- Header -->
-        <header class="header">
-            <div class="logo">
-                <span class="logo-icon">🍯</span>
-                <span class="logo-text">Honeypot</span>
-            </div>
-            <nav class="nav">
-                <a href="/" class="nav-link">Live Feed</a>
-                <a href="/stats" class="nav-link active">Statistics</a>
-            </nav>
-            <div class="header-actions">
-                <button class="btn-icon theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
-                <div class="time-filter">
-                    <select id="timeRange">
-                        <option value="24">Last 24 Hours</option>
-                        <option value="168">Last 7 Days</option>
-                        <option value="720" selected>Last 30 Days</option>
-                        <option value="8760">Last Year</option>
-                    </select>
+        <header class="sticky top-0 z-50 backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo -->
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">🍯</span>
+                        <span
+                            class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Honeypot</span>
+                    </div>
+
+                    <!-- Navigation -->
+                    <nav class="flex items-center gap-1">
+                        <a href="/"
+                            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Live
+                            Feed</a>
+                        <a href="/stats"
+                            class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Statistics</a>
+                    </nav>
+
+                    <!-- Header Actions -->
+                    <div class="flex items-center gap-4">
+                        <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl"
+                            title="Toggle theme">🌙</button>
+                        <select id="timeRange"
+                            class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="24">Last 24 Hours</option>
+                            <option value="168">Last 7 Days</option>
+                            <option value="720" selected>Last 30 Days</option>
+                            <option value="8760">Last Year</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </header>
 
-        <main class="main stats-page">
-            <!-- Overview Cards -->
-            <div class="stats-cards">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalAttacks">-</div>
-                    <div class="stat-label">Total Attacks</div>
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div id="totalAttacks" class="text-3xl font-bold text-white">-</div>
+                    <div class="text-sm text-gray-500 mt-1">Total Attacks</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="uniqueServices">-</div>
-                    <div class="stat-label">Services Targeted</div>
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div id="uniqueServices" class="text-3xl font-bold text-white">-</div>
+                    <div class="text-sm text-gray-500 mt-1">Services Targeted</div>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="uniqueCredentials">-</div>
-                    <div class="stat-label">Unique Credentials</div>
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div id="uniqueCredentials" class="text-3xl font-bold text-white">-</div>
+                    <div class="text-sm text-gray-500 mt-1">Unique Credentials</div>
                 </div>
             </div>
 
             <!-- Charts Row -->
-            <div class="charts-row">
-                <div class="chart-container glass-card">
-                    <h3>Attacks by Service</h3>
-                    <div class="chart-wrapper">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">Attacks by Service</h3>
+                    <div class="h-64">
                         <canvas id="servicesChart"></canvas>
                     </div>
                 </div>
-                <div class="chart-container glass-card">
-                    <h3>Attacks by Country</h3>
-                    <div class="chart-wrapper">
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">Attacks by Country</h3>
+                    <div class="h-64">
                         <canvas id="countriesChart"></canvas>
                     </div>
                 </div>
             </div>
 
             <!-- Tables Row -->
-            <div class="tables-row">
-                <div class="table-container glass-card">
-                    <h3>Top SSH/FTP Credentials</h3>
-                    <div class="table-wrapper">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Username</th>
-                                    <th>Password</th>
-                                    <th>Count</th>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Credentials Table -->
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-800">
+                        <h3 class="text-lg font-semibold text-white">Top SSH/FTP Credentials</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-800/50">
+                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3">Username</th>
+                                    <th class="px-6 py-3">Password</th>
+                                    <th class="px-6 py-3 text-right">Count</th>
                                 </tr>
                             </thead>
-                            <tbody id="credentialsTable">
+                            <tbody id="credentialsTable" class="divide-y divide-gray-800">
                                 <tr>
-                                    <td colspan="3">Loading...</td>
+                                    <td colspan="3" class="px-6 py-4 text-gray-500">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
-                <div class="table-container glass-card">
-                    <h3>Top HTTP Paths</h3>
-                    <div class="table-wrapper">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Path</th>
-                                    <th>Count</th>
+
+                <!-- Paths Table -->
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-800">
+                        <h3 class="text-lg font-semibold text-white">Top HTTP Paths</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-800/50">
+                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3">Path</th>
+                                    <th class="px-6 py-3 text-right">Count</th>
                                 </tr>
                             </thead>
-                            <tbody id="pathsTable">
+                            <tbody id="pathsTable" class="divide-y divide-gray-800">
                                 <tr>
-                                    <td colspan="2">Loading...</td>
+                                    <td colspan="2" class="px-6 py-4 text-gray-500">Loading...</td>
                                 </tr>
                             </tbody>
                         </table>
