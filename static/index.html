@@ -140,55 +140,84 @@
 
         <!-- Payload Modal -->
         <div id="modalOverlay"
-            class="modal-overlay fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 invisible transition-all duration-300">
+            class="modal-overlay fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center opacity-0 invisible transition-all duration-300">
             <div
-                class="modal bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto m-4 transform scale-95 transition-transform duration-300">
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-                    <h3 class="text-lg font-semibold text-white">Request Details</h3>
+                class="modal bg-gradient-to-b from-gray-900 to-gray-950 border border-gray-700/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden m-4 transform scale-95 transition-transform duration-300 shadow-2xl">
+
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800/50 bg-gray-900/50">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">🔍</span>
+                        <h3 class="text-lg font-semibold text-white">Attack Details</h3>
+                    </div>
                     <button id="modalClose"
-                        class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white">✕</button>
+                        class="p-2 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
-                <div class="p-6 space-y-4">
+
+                <div class="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]">
                     <!-- Details Grid -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <div class="text-xs text-gray-500 uppercase">IP Address</div>
-                            <div id="detailIp" class="font-mono text-white">-</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">IP Address</div>
+                            <div id="detailIp" class="font-mono text-sm text-white font-medium">-</div>
                         </div>
-                        <div>
-                            <div class="text-xs text-gray-500 uppercase">Country</div>
-                            <div id="detailCountry" class="text-white">-</div>
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Country</div>
+                            <div id="detailCountry" class="text-sm text-white font-medium">-</div>
                         </div>
-                        <div>
-                            <div class="text-xs text-gray-500 uppercase">Service</div>
-                            <div id="detailService" class="text-white">-</div>
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Service</div>
+                            <div id="detailService" class="text-sm text-white font-medium">-</div>
                         </div>
-                        <div>
-                            <div class="text-xs text-gray-500 uppercase">Port</div>
-                            <div id="detailPort" class="font-mono text-white">-</div>
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Port</div>
+                            <div id="detailPort" class="font-mono text-sm text-white font-medium">-</div>
                         </div>
-                        <div class="col-span-2">
-                            <div class="text-xs text-gray-500 uppercase">Timestamp</div>
-                            <div id="detailTime" class="text-white">-</div>
-                        </div>
-                        <div id="credentialsRow" class="col-span-2 hidden">
-                            <div class="text-xs text-gray-500 uppercase">Credentials</div>
-                            <div id="detailCredentials" class="font-mono text-amber-400 font-semibold">-</div>
+                    </div>
+
+                    <!-- Timestamp -->
+                    <div class="flex items-center gap-4 text-sm">
+                        <span class="text-gray-500">Timestamp:</span>
+                        <span id="detailTime" class="text-gray-300">-</span>
+                    </div>
+
+                    <!-- Credentials (if present) -->
+                    <div id="credentialsRow" class="hidden">
+                        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-amber-400">🔐</span>
+                                <span class="text-xs text-amber-400 uppercase tracking-wide font-medium">Captured
+                                    Credentials</span>
+                            </div>
+                            <div id="detailCredentials" class="font-mono text-lg text-amber-300 font-semibold">-</div>
                         </div>
                     </div>
 
                     <!-- Request/Headers -->
                     <div>
-                        <div class="text-xs text-gray-500 uppercase mb-2">Request / Headers</div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-cyan-400">📨</span>
+                            <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Request /
+                                Headers</span>
+                        </div>
                         <pre id="detailRequest"
-                            class="bg-gray-950 rounded-lg p-4 text-sm font-mono text-cyan-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">No request data</pre>
+                            class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm font-mono text-cyan-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin">No request data</pre>
                     </div>
 
                     <!-- Payload -->
                     <div id="payloadSection" class="hidden">
-                        <div class="text-xs text-gray-500 uppercase mb-2">Body / Payload</div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-green-400">📦</span>
+                            <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Body /
+                                Payload</span>
+                        </div>
                         <pre id="detailPayload"
-                            class="bg-gray-950 rounded-lg p-4 text-sm font-mono text-green-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">No payload</pre>
+                            class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm font-mono text-green-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin">No payload</pre>
                     </div>
                 </div>
             </div>
