@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Honeypot Dashboard</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
@@ -82,12 +83,7 @@
             <!-- Attack Map -->
             <div class="map-container glass-card">
                 <h3>Live Attack Map</h3>
-                <div class="world-map" id="worldMap">
-                    <svg viewBox="0 0 1000 500" id="mapSvg">
-                        <!-- World map will be loaded here -->
-                    </svg>
-                    <div class="map-overlay" id="mapOverlay"></div>
-                </div>
+                <div class="world-map" id="attackMap"></div>
             </div>
         </main>
 
@@ -141,6 +137,7 @@
     </div>
 
     <script src="/static/theme.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/static/app.js"></script>
 </body>
 

@@ -283,44 +283,75 @@ body {
 .world-map {
     position: relative;
     width: 100%;
-    height: 300px;
-    background: rgba(0, 0, 0, 0.3);
+    height: 350px;
+    background: var(--bg-secondary);
     border-radius: var(--radius-md);
     overflow: hidden;
 }
 
-#mapSvg {
+/* Leaflet map customization */
+#attackMap {
     width: 100%;
     height: 100%;
+    background: var(--bg-secondary);
 }
 
-.map-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
+.leaflet-container {
+    background: var(--bg-secondary) !important;
+    font-family: var(--font-sans);
+}
+
+.leaflet-popup-content-wrapper {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.leaflet-popup-tip {
+    background: var(--bg-card);
+}
+
+/* Attack marker styles */
+.attack-marker {
+    position: relative;
 }
 
 .attack-dot {
-    position: absolute;
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     background: var(--accent-danger);
     border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
     transform: translate(-50%, -50%);
-    animation: attackPulse 2s ease-out forwards;
+    box-shadow: 0 0 10px var(--accent-danger);
+    z-index: 2;
 }
 
-@keyframes attackPulse {
+.attack-pulse {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-danger);
+    opacity: 0.4;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulseRing 1.5s ease-out infinite;
+    z-index: 1;
+}
+
+@keyframes pulseRing {
     0% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.5);
+        opacity: 0.6;
     }
 
     100% {
-        transform: translate(-50%, -50%) scale(3);
+        transform: translate(-50%, -50%) scale(2);
         opacity: 0;
     }
 }

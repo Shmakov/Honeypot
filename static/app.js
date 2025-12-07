@@ -100,9 +100,9 @@ class HoneypotDashboard {
             this.addCredential(event.username, event.password || '');
         }
 
-        // Show on map
+        // Show on map (if GeoIP data available)
         if (event.latitude && event.longitude) {
-            this.showAttackOnMap(event.latitude, event.longitude);
+            this.showAttackOnMap(event.latitude, event.longitude, event.ip, event.service);
         }
     }
 
@@ -227,20 +227,11 @@ class HoneypotDashboard {
         this.modalOverlay.classList.remove('active');
     }
 
-    showAttackOnMap(lat, lon) {
-        // Simple map projection (Mercator-ish)
-        const x = ((lon + 180) / 360) * 100;
-        const y = ((90 - lat) / 180) * 100;
-
-        const dot = document.createElement('div');
-        dot.className = 'attack-dot';
-        dot.style.left = `${x}%`;
-        dot.style.top = `${y}%`;
-
-        this.mapOverlay.appendChild(dot);
-
-        // Remove after animation
-        setTimeout(() => dot.remove(), 2000);
+    showAttackOnMap(lat, lon, ip, service) {
+        // Use Leaflet map if available
+        if (window.addAttackDot) {
+            window.addAttackDot(lat, lon, ip, service);
+        }
     }
 
     updateCredentialsList(credentials) {
@@ -340,51 +331,73 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dashboard = new HoneypotDashboard();
 });
 
-// Load world map SVG with simplified continent outlines
-function loadWorldMap() {
-    const svg = document.getElementById('mapSvg');
-    // Simplified world map paths (continents)
-    svg.innerHTML = `
-        <defs>
-            <linearGradient id="mapGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:rgba(59,130,246,0.15)"/>
-                <stop offset="100%" style="stop-color:rgba(139,92,246,0.1)"/>
-            </linearGradient>
-            <filter id="glow">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-            </filter>
-        </defs>
-        <rect width="1000" height="500" fill="url(#mapGradient)"/>
-        <!-- Grid -->
-        <g stroke="rgba(255,255,255,0.05)" stroke-width="0.5">
-            <line x1="0" y1="250" x2="1000" y2="250"/>
-            <line x1="500" y1="0" x2="500" y2="500"/>
-            ${[...Array(9)].map((_, i) => `<line x1="${(i + 1) * 100}" y1="0" x2="${(i + 1) * 100}" y2="500"/>`).join('')}
-            ${[...Array(4)].map((_, i) => `<line x1="0" y1="${(i + 1) * 100}" x2="1000" y2="${(i + 1) * 100}"/>`).join('')}
-        </g>
-        <!-- Simplified continents -->
-        <g fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5">
-            <!-- North America -->
-            <path d="M50,100 L200,80 L280,120 L290,180 L240,220 L180,240 L120,200 L80,160 Z"/>
-            <!-- South America -->
-            <path d="M180,260 L220,280 L240,340 L200,420 L160,380 L170,300 Z"/>
-            <!-- Europe -->
-            <path d="M440,100 L520,90 L540,140 L500,160 L460,150 L440,120 Z"/>
-            <!-- Africa -->
-            <path d="M440,180 L520,170 L560,240 L540,340 L460,360 L420,280 L430,220 Z"/>
-            <!-- Asia -->
-            <path d="M540,80 L760,60 L840,120 L820,200 L720,240 L620,200 L560,140 Z"/>
-            <!-- Australia -->
-            <path d="M760,320 L840,300 L880,340 L860,400 L780,380 Z"/>
-        </g>
-        <!-- Server location marker (center) -->
-        <circle cx="500" cy="250" r="4" fill="#3b82f6" filter="url(#glow)" opacity="0.8"/>
-    `;
+// Attack Map using Leaflet.js
+let attackMap = null;
+let attackMarkers = [];
+const MAX_MARKERS = 50;
+
+function initAttackMap() {
+    const mapElement = document.getElementById('attackMap');
+    if (!mapElement || attackMap) return;
+
+    // Initialize map centered on world
+    attackMap = L.map('attackMap', {
+        center: [30, 0],
+        zoom: 2,
+        minZoom: 1,
+        maxZoom: 6,
+        zoomControl: true,
+        attributionControl: false
+    });
+
+    // Dark theme tiles (CartoDB Dark Matter - free)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(attackMap);
+
+    // Add subtle attribution
+    L.control.attribution({
+        position: 'bottomright',
+        prefix: false
+    }).addAttribution('© <a href="https://carto.com/">CARTO</a>').addTo(attackMap);
 }
 
-document.addEventListener('DOMContentLoaded', loadWorldMap);
+// Add an attack dot to the map
+function addAttackDot(lat, lon, ip, service) {
+    if (!attackMap) return;
 
+    // Create pulsing marker
+    const attackIcon = L.divIcon({
+        className: 'attack-marker',
+        html: `<div class="attack-pulse"></div><div class="attack-dot" data-service="${service}"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+    });
+
+    const marker = L.marker([lat, lon], { icon: attackIcon })
+        .bindPopup(`<b>${ip}</b><br>${service}`)
+        .addTo(attackMap);
+
+    attackMarkers.push(marker);
+
+    // Remove old markers if too many
+    if (attackMarkers.length > MAX_MARKERS) {
+        const oldMarker = attackMarkers.shift();
+        attackMap.removeLayer(oldMarker);
+    }
+
+    // Auto-remove after 30 seconds
+    setTimeout(() => {
+        const idx = attackMarkers.indexOf(marker);
+        if (idx > -1) {
+            attackMarkers.splice(idx, 1);
+            attackMap.removeLayer(marker);
+        }
+    }, 30000);
+}
+
+// Expose for dashboard to call
+window.addAttackDot = addAttackDot;
+
+document.addEventListener('DOMContentLoaded', initAttackMap);
