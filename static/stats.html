@@ -25,13 +25,16 @@
                 <a href="/" class="nav-link">Live Feed</a>
                 <a href="/stats" class="nav-link active">Statistics</a>
             </nav>
-            <div class="time-filter">
-                <select id="timeRange">
-                    <option value="24">Last 24 Hours</option>
-                    <option value="168">Last 7 Days</option>
-                    <option value="720" selected>Last 30 Days</option>
-                    <option value="8760">Last Year</option>
-                </select>
+            <div class="header-actions">
+                <button class="btn-icon theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+                <div class="time-filter">
+                    <select id="timeRange">
+                        <option value="24">Last 24 Hours</option>
+                        <option value="168">Last 7 Days</option>
+                        <option value="720" selected>Last 30 Days</option>
+                        <option value="8760">Last Year</option>
+                    </select>
+                </div>
             </div>
         </header>
 
@@ -111,6 +114,7 @@
         </main>
     </div>
 
+    <script src="/static/theme.js"></script>
     <script src="/static/stats.js"></script>
 </body>
 

@@ -301,29 +301,7 @@ class HoneypotDashboard {
             this.events = [];
         });
 
-        // Theme toggle
-        const themeToggle = document.getElementById('themeToggle');
-        if (themeToggle) {
-            // Load saved theme
-            const savedTheme = localStorage.getItem('theme') || 'dark';
-            if (savedTheme === 'light') {
-                document.documentElement.setAttribute('data-theme', 'light');
-                themeToggle.textContent = '☀️';
-            }
-
-            themeToggle.addEventListener('click', () => {
-                const currentTheme = document.documentElement.getAttribute('data-theme');
-                if (currentTheme === 'light') {
-                    document.documentElement.removeAttribute('data-theme');
-                    themeToggle.textContent = '🌙';
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.documentElement.setAttribute('data-theme', 'light');
-                    themeToggle.textContent = '☀️';
-                    localStorage.setItem('theme', 'light');
-                }
-            });
-        }
+        // Theme toggle is handled by theme.js
 
         // Modal close
         document.getElementById('modalClose').addEventListener('click', () => this.hideModal());
@@ -386,7 +364,7 @@ function loadWorldMap() {
             <line x1="0" y1="250" x2="1000" y2="250"/>
             <line x1="500" y1="0" x2="500" y2="500"/>
             ${[...Array(9)].map((_, i) => `<line x1="${(i + 1) * 100}" y1="0" x2="${(i + 1) * 100}" y2="500"/>`).join('')}
-            ${[...Array(4)].map((_, i) => `<line x1="0" y1="${(i + 1) * 100}" x2="1000" y2="${(i + 1) * 100}/>`).join('')}
+            ${[...Array(4)].map((_, i) => `<line x1="0" y1="${(i + 1) * 100}" x2="1000" y2="${(i + 1) * 100}"/>`).join('')}
         </g>
         <!-- Simplified continents -->
         <g fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5">
