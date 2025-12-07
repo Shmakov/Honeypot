@@ -2,12 +2,13 @@
 
 use anyhow::Result;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::db::Database;
 use crate::events::EventBus;
+use crate::geoip::SharedGeoIp;
 
-pub async fn start(_event_bus: Arc<EventBus>, _db: Arc<Database>) -> Result<()> {
+pub async fn start(_event_bus: Arc<EventBus>, _db: Arc<Database>, _geoip: SharedGeoIp) -> Result<()> {
     // ICMP capture requires either:
     // 1. tcpdump installed and accessible
     // 2. CAP_NET_RAW capability for raw sockets

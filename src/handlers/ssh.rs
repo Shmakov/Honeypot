@@ -9,6 +9,7 @@ use tracing::{debug, info, warn};
 use crate::config::Config;
 use crate::db::{AttackEvent, Database};
 use crate::events::EventBus;
+use crate::geoip::SharedGeoIp;
 
 /// Simple SSH banner response that accepts any credentials
 pub async fn start(
@@ -16,6 +17,7 @@ pub async fn start(
     config: Arc<Config>,
     event_bus: Arc<EventBus>,
     db: Arc<Database>,
+    geoip: SharedGeoIp,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
     let listener = match TcpListener::bind(&addr).await {
@@ -36,6 +38,7 @@ pub async fn start(
                 let event_bus = event_bus.clone();
                 let db = db.clone();
                 let banner = banner.clone();
+                let geoip = geoip.clone();
 
                 tokio::spawn(async move {
                     // Send SSH banner
@@ -60,14 +63,15 @@ pub async fn start(
                     let client_banner = String::from_utf8_lossy(&payload);
                     let request = format!("SSH {} -> port {}: {}", ip, port, client_banner.trim());
 
-                    let mut event = AttackEvent::new(ip, "ssh".to_string(), port, request);
+                    let mut event = AttackEvent::new(ip.clone(), "ssh".to_string(), port, request);
                     if !payload.is_empty() {
                         event = event.with_payload(payload);
                     }
-
-                    // For a more complete SSH honeypot, we would use russh library
-                    // to properly handle the SSH handshake and capture credentials.
-                    // This is a simplified version that just captures the banner exchange.
+                    
+                    // Add GeoIP info
+                    if let Some(loc) = geoip.lookup(&ip) {
+                        event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
+                    }
 
                     if let Err(e) = db.insert_event(&event).await {
                         warn!("Failed to store SSH event: {}", e);

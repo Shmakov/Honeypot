@@ -18,11 +18,12 @@ use tracing::info;
 use crate::config::Config;
 use crate::db::{AttackEvent, Database};
 use crate::events::EventBus;
+use crate::geoip::SharedGeoIp;
 
 pub struct AppState {
     pub event_bus: EventBus,
     pub db: Database,
-    pub config: Config,
+    pub geoip: SharedGeoIp,
 }
 
 /// Log an HTTP request as an attack event
@@ -35,6 +36,11 @@ async fn log_http_event(state: &AppState, ip: String, method: &str, uri: &str) {
         request_str,
     );
     event.http_path = Some(uri.to_string());
+    
+    // Add GeoIP info
+    if let Some(loc) = state.geoip.lookup(&ip) {
+        event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
+    }
     
     if let Err(e) = state.db.insert_event(&event).await {
         tracing::warn!("Failed to store HTTP event: {}", e);
@@ -80,11 +86,11 @@ async fn catch_all(
     (StatusCode::NOT_FOUND, "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL was not found on this server.</p></body></html>")
 }
 
-pub async fn start_server(config: &Config, event_bus: EventBus, db: Database) -> Result<()> {
+pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp) -> Result<()> {
     let state = Arc::new(AppState {
         event_bus,
         db,
-        config: config.clone(),
+        geoip,
     });
 
     let app = Router::new()

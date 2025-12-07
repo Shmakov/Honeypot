@@ -13,6 +13,7 @@ use tracing::info;
 use crate::config::Config;
 use crate::db::Database;
 use crate::events::EventBus;
+use crate::geoip::SharedGeoIp;
 
 /// TCP ports to listen on (most common)
 pub const TCP_PORTS: &[(u16, &str)] = &[
@@ -55,7 +56,7 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
 ];
 
 /// Start all protocol handlers
-pub async fn start_all(config: &Config, event_bus: EventBus, db: Database) -> Result<()> {
+pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp) -> Result<()> {
     let config = Arc::new(config.clone());
     let event_bus = Arc::new(event_bus);
     let db = Arc::new(db);
@@ -67,26 +68,27 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database) -> Re
         let config = config.clone();
         let event_bus = event_bus.clone();
         let db = db.clone();
+        let geoip = geoip.clone();
 
         tokio::spawn(async move {
             match service.as_str() {
                 "ssh" => {
-                    if let Err(e) = ssh::start(port, config, event_bus, db).await {
+                    if let Err(e) = ssh::start(port, config, event_bus, db, geoip).await {
                         tracing::debug!("SSH handler on port {} failed: {}", port, e);
                     }
                 }
                 "ftp" => {
-                    if let Err(e) = ftp::start(port, config, event_bus, db).await {
+                    if let Err(e) = ftp::start(port, config, event_bus, db, geoip).await {
                         tracing::debug!("FTP handler on port {} failed: {}", port, e);
                     }
                 }
                 "telnet" => {
-                    if let Err(e) = telnet::start(port, config, event_bus, db).await {
+                    if let Err(e) = telnet::start(port, config, event_bus, db, geoip).await {
                         tracing::debug!("Telnet handler on port {} failed: {}", port, e);
                     }
                 }
                 _ => {
-                    if let Err(e) = tcp::start(port, &service, config, event_bus, db).await {
+                    if let Err(e) = tcp::start(port, &service, config, event_bus, db, geoip).await {
                         tracing::debug!("{} handler on port {} failed: {}", service, port, e);
                     }
                 }
@@ -97,8 +99,9 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database) -> Re
     // ICMP handler (optional, requires CAP_NET_RAW)
     let event_bus_icmp = event_bus.clone();
     let db_icmp = db.clone();
+    let geoip_icmp = geoip.clone();
     tokio::spawn(async move {
-        if let Err(e) = icmp::start(event_bus_icmp, db_icmp).await {
+        if let Err(e) = icmp::start(event_bus_icmp, db_icmp, geoip_icmp).await {
             tracing::debug!("ICMP handler failed: {}", e);
         }
     });

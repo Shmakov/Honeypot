@@ -9,6 +9,7 @@ use tracing::{debug, info, warn};
 use crate::config::Config;
 use crate::db::{AttackEvent, Database};
 use crate::events::EventBus;
+use crate::geoip::SharedGeoIp;
 
 /// Protocol-specific banners for emulation
 fn get_banner(service: &str, config: &Config) -> Option<String> {
@@ -36,6 +37,7 @@ pub async fn start(
     config: Arc<Config>,
     event_bus: Arc<EventBus>,
     db: Arc<Database>,
+    geoip: SharedGeoIp,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
     let listener = match TcpListener::bind(&addr).await {
@@ -58,6 +60,7 @@ pub async fn start(
                 let banner = banner.clone();
                 let event_bus = event_bus.clone();
                 let db = db.clone();
+                let geoip = geoip.clone();
 
                 tokio::spawn(async move {
                     // Send banner if available
@@ -84,9 +87,14 @@ pub async fn start(
                         peer_addr.port(),
                         port
                     );
-                    let mut event = AttackEvent::new(ip, service, port, request);
+                    let mut event = AttackEvent::new(ip.clone(), service, port, request);
                     if let Some(p) = payload {
                         event = event.with_payload(p);
+                    }
+                    
+                    // Add GeoIP info
+                    if let Some(loc) = geoip.lookup(&ip) {
+                        event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
                     }
 
                     // Store and broadcast

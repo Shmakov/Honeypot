@@ -9,12 +9,14 @@ use tracing::{debug, info, warn};
 use crate::config::Config;
 use crate::db::{AttackEvent, Database};
 use crate::events::EventBus;
+use crate::geoip::SharedGeoIp;
 
 pub async fn start(
     port: u16,
     config: Arc<Config>,
     event_bus: Arc<EventBus>,
     db: Arc<Database>,
+    geoip: SharedGeoIp,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
     let listener = match TcpListener::bind(&addr).await {
@@ -33,9 +35,10 @@ pub async fn start(
                 let ip = peer_addr.ip().to_string();
                 let event_bus = event_bus.clone();
                 let db = db.clone();
+                let geoip = geoip.clone();
 
                 tokio::spawn(async move {
-                    handle_telnet_session(socket, ip, port, event_bus, db).await;
+                    handle_telnet_session(socket, ip, port, event_bus, db, geoip).await;
                 });
             }
             Err(e) => {
@@ -51,6 +54,7 @@ async fn handle_telnet_session(
     port: u16,
     event_bus: Arc<EventBus>,
     db: Arc<Database>,
+    geoip: SharedGeoIp,
 ) {
     let (reader, mut writer) = socket.into_split();
     let mut reader = BufReader::new(reader);
@@ -129,7 +133,7 @@ async fn handle_telnet_session(
         format!("Telnet connection from {}", ip)
     };
 
-    let mut event = AttackEvent::new(ip, "telnet".to_string(), port, request);
+    let mut event = AttackEvent::new(ip.clone(), "telnet".to_string(), port, request);
     
     if !username.is_empty() {
         event = event.with_credentials(username, password);
@@ -137,6 +141,11 @@ async fn handle_telnet_session(
     
     if !commands.is_empty() {
         event = event.with_payload(commands.join("\n").into_bytes());
+    }
+    
+    // Add GeoIP info
+    if let Some(loc) = geoip.lookup(&ip) {
+        event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
     }
 
     if let Err(e) = db.insert_event(&event).await {

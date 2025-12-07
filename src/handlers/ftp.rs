@@ -9,12 +9,14 @@ use tracing::{debug, info, warn};
 use crate::config::Config;
 use crate::db::{AttackEvent, Database};
 use crate::events::EventBus;
+use crate::geoip::SharedGeoIp;
 
 pub async fn start(
     port: u16,
     config: Arc<Config>,
     event_bus: Arc<EventBus>,
     db: Arc<Database>,
+    geoip: SharedGeoIp,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
     let listener = match TcpListener::bind(&addr).await {
@@ -35,9 +37,10 @@ pub async fn start(
                 let event_bus = event_bus.clone();
                 let db = db.clone();
                 let banner = banner.clone();
+                let geoip = geoip.clone();
 
                 tokio::spawn(async move {
-                    handle_ftp_session(socket, ip, port, banner, event_bus, db).await;
+                    handle_ftp_session(socket, ip, port, banner, event_bus, db, geoip).await;
                 });
             }
             Err(e) => {
@@ -54,6 +57,7 @@ async fn handle_ftp_session(
     banner: String,
     event_bus: Arc<EventBus>,
     db: Arc<Database>,
+    geoip: SharedGeoIp,
 ) {
     let (reader, mut writer) = socket.into_split();
     let mut reader = BufReader::new(reader);
@@ -131,7 +135,7 @@ async fn handle_ftp_session(
         format!("FTP connection from {}", ip)
     };
 
-    let mut event = AttackEvent::new(ip, "ftp".to_string(), port, request);
+    let mut event = AttackEvent::new(ip.clone(), "ftp".to_string(), port, request);
     
     if !username.is_empty() {
         event = event.with_credentials(username, password);
@@ -139,6 +143,11 @@ async fn handle_ftp_session(
     
     if !commands.is_empty() {
         event = event.with_payload(commands.join("\n").into_bytes());
+    }
+    
+    // Add GeoIP info
+    if let Some(loc) = geoip.lookup(&ip) {
+        event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
     }
 
     if let Err(e) = db.insert_event(&event).await {
