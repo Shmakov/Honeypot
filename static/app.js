@@ -306,29 +306,51 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dashboard = new HoneypotDashboard();
 });
 
-// Load basic world map SVG
+// Load world map SVG with simplified continent outlines
 function loadWorldMap() {
     const svg = document.getElementById('mapSvg');
-    // Simple world outline - you can replace with a proper world map SVG
+    // Simplified world map paths (continents)
     svg.innerHTML = `
         <defs>
             <linearGradient id="mapGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:rgba(59,130,246,0.1)"/>
+                <stop offset="0%" style="stop-color:rgba(59,130,246,0.15)"/>
                 <stop offset="100%" style="stop-color:rgba(139,92,246,0.1)"/>
             </linearGradient>
+            <filter id="glow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
         </defs>
         <rect width="1000" height="500" fill="url(#mapGradient)"/>
-        <g fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1">
-            <!-- Grid lines -->
+        <!-- Grid -->
+        <g stroke="rgba(255,255,255,0.05)" stroke-width="0.5">
             <line x1="0" y1="250" x2="1000" y2="250"/>
             <line x1="500" y1="0" x2="500" y2="500"/>
-            <line x1="0" y1="125" x2="1000" y2="125"/>
-            <line x1="0" y1="375" x2="1000" y2="375"/>
-            <line x1="250" y1="0" x2="250" y2="500"/>
-            <line x1="750" y1="0" x2="750" y2="500"/>
+            ${[...Array(9)].map((_, i) => `<line x1="${(i + 1) * 100}" y1="0" x2="${(i + 1) * 100}" y2="500"/>`).join('')}
+            ${[...Array(4)].map((_, i) => `<line x1="0" y1="${(i + 1) * 100}" x2="1000" y2="${(i + 1) * 100}/>`).join('')}
         </g>
-        <text x="500" y="260" text-anchor="middle" fill="rgba(255,255,255,0.2)" font-size="14">World Map</text>
+        <!-- Simplified continents -->
+        <g fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5">
+            <!-- North America -->
+            <path d="M50,100 L200,80 L280,120 L290,180 L240,220 L180,240 L120,200 L80,160 Z"/>
+            <!-- South America -->
+            <path d="M180,260 L220,280 L240,340 L200,420 L160,380 L170,300 Z"/>
+            <!-- Europe -->
+            <path d="M440,100 L520,90 L540,140 L500,160 L460,150 L440,120 Z"/>
+            <!-- Africa -->
+            <path d="M440,180 L520,170 L560,240 L540,340 L460,360 L420,280 L430,220 Z"/>
+            <!-- Asia -->
+            <path d="M540,80 L760,60 L840,120 L820,200 L720,240 L620,200 L560,140 Z"/>
+            <!-- Australia -->
+            <path d="M760,320 L840,300 L880,340 L860,400 L780,380 Z"/>
+        </g>
+        <!-- Server location marker (center) -->
+        <circle cx="500" cy="250" r="4" fill="#3b82f6" filter="url(#glow)" opacity="0.8"/>
     `;
 }
 
 document.addEventListener('DOMContentLoaded', loadWorldMap);
+
