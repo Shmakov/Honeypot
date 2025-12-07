@@ -273,22 +273,34 @@ class HoneypotDashboard {
     }
 
     updateConnectionStatus(status) {
+        if (!this.connectionStatus) return;
+
         const dot = this.connectionStatus.querySelector('.status-dot');
         const text = this.connectionStatus.querySelector('.status-text');
+        if (!dot || !text) return;
 
-        dot.className = 'status-dot';
+        // Reset classes
+        dot.className = 'status-dot w-2 h-2 rounded-full';
 
         switch (status) {
             case 'connected':
-                dot.classList.add('connected');
+                dot.classList.add('bg-green-500');
                 text.textContent = 'Live';
+                text.className = 'status-text text-xs text-green-500 font-medium';
+                // Add pulsing animation
+                dot.style.animation = 'pulse 2s infinite';
                 break;
             case 'error':
-                dot.classList.add('error');
+                dot.classList.add('bg-red-500');
                 text.textContent = 'Reconnecting...';
+                text.className = 'status-text text-xs text-red-400';
+                dot.style.animation = 'none';
                 break;
             default:
+                dot.classList.add('bg-yellow-500', 'animate-pulse');
                 text.textContent = 'Connecting...';
+                text.className = 'status-text text-xs text-gray-400';
+                dot.style.animation = '';
         }
     }
 
