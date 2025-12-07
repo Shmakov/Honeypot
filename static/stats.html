@@ -22,6 +22,9 @@
         }
     </script>
 
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <!-- Custom styles -->
     <link rel="stylesheet" href="/static/custom.css">
 
@@ -40,7 +43,7 @@
 
         <!-- Header -->
         <header class="sticky top-0 z-50 backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="max-w-7xl mx-auto px-6 lg:px-8">
                 <div class="flex items-center justify-between h-16">
                     <!-- Logo -->
                     <div class="flex items-center gap-3">
@@ -50,20 +53,26 @@
                     </div>
 
                     <!-- Navigation -->
-                    <nav class="flex items-center gap-1">
+                    <nav class="flex items-center gap-2">
                         <a href="/"
-                            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Live
-                            Feed</a>
+                            class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">
+                            <span class="relative flex h-2 w-2">
+                                <span
+                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            </span>
+                            Live Feed
+                        </a>
                         <a href="/stats"
                             class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Statistics</a>
                     </nav>
 
                     <!-- Header Actions -->
-                    <div class="flex items-center gap-4">
-                        <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl"
+                    <div class="flex items-center gap-3">
+                        <button id="themeToggle" class="p-2.5 rounded-lg hover:bg-gray-800 transition-colors text-xl"
                             title="Toggle theme">🌙</button>
                         <select id="timeRange"
-                            class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            class="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
                             <option value="24">Last 24 Hours</option>
                             <option value="168">Last 7 Days</option>
                             <option value="720" selected>Last 30 Days</option>
@@ -74,35 +83,65 @@
             </div>
         </header>
 
-        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <main class="max-w-7xl mx-auto px-6 lg:px-8 py-8">
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-500 text-sm font-medium">Total Attacks</span>
+                        <span class="text-2xl">🎯</span>
+                    </div>
                     <div id="totalAttacks" class="text-3xl font-bold text-white">-</div>
-                    <div class="text-sm text-gray-500 mt-1">Total Attacks</div>
                 </div>
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-500 text-sm font-medium">Unique IPs</span>
+                        <span class="text-2xl">🌐</span>
+                    </div>
+                    <div id="uniqueIps" class="text-3xl font-bold text-white">-</div>
+                </div>
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-500 text-sm font-medium">Services Targeted</span>
+                        <span class="text-2xl">🔌</span>
+                    </div>
                     <div id="uniqueServices" class="text-3xl font-bold text-white">-</div>
-                    <div class="text-sm text-gray-500 mt-1">Services Targeted</div>
                 </div>
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <div id="uniqueCredentials" class="text-3xl font-bold text-white">-</div>
-                    <div class="text-sm text-gray-500 mt-1">Unique Credentials</div>
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-gray-500 text-sm font-medium">Countries</span>
+                        <span class="text-2xl">🗺️</span>
+                    </div>
+                    <div id="uniqueCountries" class="text-3xl font-bold text-white">-</div>
                 </div>
             </div>
 
+            <!-- Attack Map (Full Width) -->
+            <div
+                class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden mb-8">
+                <div class="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-white">Attack Origins</h3>
+                    <span class="text-sm text-gray-500">Aggregated by country</span>
+                </div>
+                <div id="statsMap" class="h-80"></div>
+            </div>
+
             <!-- Charts Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <h3 class="text-lg font-semibold text-white mb-4">Attacks by Service</h3>
-                    <div class="h-64">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-6">Attacks by Service</h3>
+                    <div class="h-72 flex items-center justify-center">
                         <canvas id="servicesChart"></canvas>
                     </div>
                 </div>
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <h3 class="text-lg font-semibold text-white mb-4">Attacks by Country</h3>
-                    <div class="h-64">
+                <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
+                    <h3 class="text-lg font-semibold text-white mb-6">Top Countries</h3>
+                    <div class="h-72 flex items-center justify-center">
                         <canvas id="countriesChart"></canvas>
                     </div>
                 </div>
@@ -111,22 +150,29 @@
             <!-- Tables Row -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Credentials Table -->
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-800">
                         <h3 class="text-lg font-semibold text-white">Top SSH/FTP Credentials</h3>
+                        <p class="text-sm text-gray-500 mt-1">Most attempted username:password combinations</p>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
-                            <thead class="bg-gray-800/50">
-                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    <th class="px-6 py-3">Username</th>
-                                    <th class="px-6 py-3">Password</th>
-                                    <th class="px-6 py-3 text-right">Count</th>
+                            <thead class="bg-gray-800/30">
+                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th class="px-6 py-4">Username</th>
+                                    <th class="px-6 py-4">Password</th>
+                                    <th class="px-6 py-4 text-right">Count</th>
                                 </tr>
                             </thead>
-                            <tbody id="credentialsTable" class="divide-y divide-gray-800">
+                            <tbody id="credentialsTable" class="divide-y divide-gray-800/50">
                                 <tr>
-                                    <td colspan="3" class="px-6 py-4 text-gray-500">Loading...</td>
+                                    <td colspan="3" class="px-6 py-8 text-center text-gray-500">
+                                        <div class="flex flex-col items-center gap-2">
+                                            <span class="text-2xl">📊</span>
+                                            <span>Loading data...</span>
+                                        </div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -134,21 +180,28 @@
                 </div>
 
                 <!-- Paths Table -->
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-800">
                         <h3 class="text-lg font-semibold text-white">Top HTTP Paths</h3>
+                        <p class="text-sm text-gray-500 mt-1">Most requested endpoint paths</p>
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
-                            <thead class="bg-gray-800/50">
-                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                    <th class="px-6 py-3">Path</th>
-                                    <th class="px-6 py-3 text-right">Count</th>
+                            <thead class="bg-gray-800/30">
+                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th class="px-6 py-4">Path</th>
+                                    <th class="px-6 py-4 text-right">Count</th>
                                 </tr>
                             </thead>
-                            <tbody id="pathsTable" class="divide-y divide-gray-800">
+                            <tbody id="pathsTable" class="divide-y divide-gray-800/50">
                                 <tr>
-                                    <td colspan="2" class="px-6 py-4 text-gray-500">Loading...</td>
+                                    <td colspan="2" class="px-6 py-8 text-center text-gray-500">
+                                        <div class="flex flex-col items-center gap-2">
+                                            <span class="text-2xl">📊</span>
+                                            <span>Loading data...</span>
+                                        </div>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -156,9 +209,15 @@
                 </div>
             </div>
         </main>
+
+        <!-- Footer -->
+        <footer class="max-w-7xl mx-auto px-6 lg:px-8 py-8 text-center text-gray-600 text-sm">
+            Honeypot Dashboard • Data updates in real-time
+        </footer>
     </div>
 
     <script src="/static/theme.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/static/stats.js"></script>
 </body>
 
