@@ -51,28 +51,17 @@
                     </div>
 
                     <!-- Navigation -->
-                    <nav class="flex items-center gap-1">
+                    <nav class="flex items-center gap-2">
                         <a href="/"
-                            class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">
-                            <span class="relative flex h-2 w-2">
-                                <span
-                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                            </span>
-                            Live Feed
-                        </a>
+                            class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Dashboard</a>
                         <a href="/stats"
                             class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Statistics</a>
                     </nav>
 
                     <!-- Header Actions -->
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3">
                         <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl"
                             title="Toggle theme">🌙</button>
-                        <div id="connectionStatus" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-800">
-                            <span class="status-dot w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
-                            <span class="status-text text-xs text-gray-400">Connecting...</span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -101,7 +90,14 @@
             <!-- Live Feed -->
             <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-                    <h3 class="text-lg font-semibold text-white">Live Attack Feed</h3>
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-lg font-semibold text-white">Live Attack Feed</h3>
+                        <div id="connectionStatus"
+                            class="flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-800/50">
+                            <span class="status-dot w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                            <span class="status-text text-xs text-gray-400">Connecting...</span>
+                        </div>
+                    </div>
                     <div class="flex items-center gap-2">
                         <button id="pauseBtn"
                             class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"

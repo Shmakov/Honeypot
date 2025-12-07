@@ -49,7 +49,8 @@
 }
 
 /* Attack map - Leaflet overrides */
-#attackMap {
+#attackMap,
+#statsMap {
     height: 320px !important;
     background: #1a1a2e !important;
 }
@@ -75,7 +76,8 @@
 }
 
 /* Attack markers */
-.attack-marker {
+.attack-marker,
+.country-marker {
     position: relative;
 }
 
@@ -149,93 +151,116 @@
     color: #9ca3af;
 }
 
-/* Light theme overrides */
-[data-theme="light"] body,
-.light body {
+/* ===== LIGHT THEME ===== */
+/* Apply to body when data-theme="light" is on html */
+[data-theme="light"] {
+    /* Override body */
     background-color: #f8fafc !important;
     color: #1e293b !important;
 }
 
-[data-theme="light"] header,
-.light header {
+[data-theme="light"] body {
+    background-color: #f8fafc !important;
+    color: #1e293b !important;
+}
+
+/* Header */
+[data-theme="light"] header {
     background-color: rgba(255, 255, 255, 0.9) !important;
     border-color: #e2e8f0 !important;
 }
 
-[data-theme="light"] .bg-gray-900\/50,
-.light .bg-gray-900\/50 {
-    background-color: rgba(255, 255, 255, 0.8) !important;
-}
-
-[data-theme="light"] .bg-gray-900,
-.light .bg-gray-900 {
+/* Cards and containers - using attribute selectors */
+[data-theme="light"] [class*="bg-gray-900"] {
     background-color: #ffffff !important;
 }
 
-[data-theme="light"] .bg-gray-800,
-.light .bg-gray-800 {
+[data-theme="light"] [class*="bg-gray-950"] {
     background-color: #f1f5f9 !important;
 }
 
-[data-theme="light"] .bg-gray-800\/50,
-.light .bg-gray-800\/50 {
-    background-color: rgba(241, 245, 249, 0.8) !important;
+[data-theme="light"] [class*="bg-gray-800"] {
+    background-color: #f1f5f9 !important;
 }
 
-[data-theme="light"] .border-gray-800,
-.light .border-gray-800 {
+[data-theme="light"] [class*="from-gray-900"] {
+    --tw-gradient-from: #ffffff !important;
+}
+
+[data-theme="light"] [class*="to-gray-900"] {
+    --tw-gradient-to: #f8fafc !important;
+}
+
+[data-theme="light"] [class*="to-gray-950"] {
+    --tw-gradient-to: #f8fafc !important;
+}
+
+/* Borders */
+[data-theme="light"] [class*="border-gray-800"],
+[data-theme="light"] [class*="border-gray-700"] {
     border-color: #e2e8f0 !important;
 }
 
-[data-theme="light"] .border-gray-700,
-.light .border-gray-700 {
-    border-color: #e2e8f0 !important;
-}
-
-[data-theme="light"] .text-white,
-.light .text-white {
+/* Text colors */
+[data-theme="light"] [class*="text-white"] {
     color: #1e293b !important;
 }
 
-[data-theme="light"] .text-gray-100,
-.light .text-gray-100 {
+[data-theme="light"] [class*="text-gray-100"] {
     color: #334155 !important;
 }
 
-[data-theme="light"] .text-gray-400,
-.light .text-gray-400 {
+[data-theme="light"] [class*="text-gray-300"] {
+    color: #475569 !important;
+}
+
+[data-theme="light"] [class*="text-gray-400"] {
     color: #64748b !important;
 }
 
-[data-theme="light"] .text-gray-500,
-.light .text-gray-500 {
-    color: #64748b !important;
-}
-
-[data-theme="light"] .divide-gray-800> :not([hidden])~ :not([hidden]),
-.light .divide-gray-800> :not([hidden])~ :not([hidden]) {
+/* Dividers */
+[data-theme="light"] [class*="divide-gray-800"]>*,
+[data-theme="light"] [class*="divide-gray-800/50"]>* {
     border-color: #e2e8f0 !important;
 }
 
-[data-theme="light"] .bg-gray-950,
-.light .bg-gray-950 {
-    background-color: #f1f5f9 !important;
-}
-
-[data-theme="light"] #feedBody tr:hover,
-.light #feedBody tr:hover {
+/* Table rows */
+[data-theme="light"] #feedBody tr:hover {
     background-color: rgba(59, 130, 246, 0.08) !important;
 }
 
-[data-theme="light"] .leaflet-popup-content-wrapper,
-.light .leaflet-popup-content-wrapper {
+/* Map */
+[data-theme="light"] #attackMap,
+[data-theme="light"] #statsMap {
+    background: #e2e8f0 !important;
+}
+
+[data-theme="light"] .leaflet-container {
+    background: #e2e8f0 !important;
+}
+
+[data-theme="light"] .leaflet-popup-content-wrapper {
     background: #ffffff !important;
     color: #1e293b !important;
 }
 
-[data-theme="light"] .leaflet-popup-tip,
-.light .leaflet-popup-tip {
+[data-theme="light"] .leaflet-popup-tip {
     background: #ffffff !important;
+}
+
+/* Modal specific */
+[data-theme="light"] .modal {
+    background: linear-gradient(to bottom, #ffffff, #f8fafc) !important;
+}
+
+[data-theme="light"] .modal [class*="bg-gray-800"] {
+    background-color: #f1f5f9 !important;
+}
+
+/* Pre/code blocks in light theme */
+[data-theme="light"] pre[class*="bg-gray-950"] {
+    background-color: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
 }
 
 /* Scrollbar styling */
@@ -263,4 +288,11 @@
 
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+}
+
+/* Select dropdown in light mode */
+[data-theme="light"] select {
+    background-color: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
 }
