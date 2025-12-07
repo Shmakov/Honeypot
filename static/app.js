@@ -301,6 +301,30 @@ class HoneypotDashboard {
             this.events = [];
         });
 
+        // Theme toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            // Load saved theme
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                themeToggle.textContent = '☀️';
+            }
+
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                if (currentTheme === 'light') {
+                    document.documentElement.removeAttribute('data-theme');
+                    themeToggle.textContent = '🌙';
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                    themeToggle.textContent = '☀️';
+                    localStorage.setItem('theme', 'light');
+                }
+            });
+        }
+
         // Modal close
         document.getElementById('modalClose').addEventListener('click', () => this.hideModal());
         document.getElementById('modalOverlay').addEventListener('click', (e) => {

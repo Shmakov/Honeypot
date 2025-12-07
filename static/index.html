@@ -24,9 +24,12 @@
                 <a href="/" class="nav-link active">Live Feed</a>
                 <a href="/stats" class="nav-link">Statistics</a>
             </nav>
-            <div class="connection-status" id="connectionStatus">
-                <span class="status-dot"></span>
-                <span class="status-text">Connecting...</span>
+            <div class="header-actions">
+                <button class="btn-icon theme-toggle" id="themeToggle" title="Toggle theme">🌙</button>
+                <div class="connection-status" id="connectionStatus">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
             </div>
         </header>
 
@@ -49,18 +52,7 @@
                 </div>
             </div>
 
-            <!-- Attack Map -->
-            <div class="map-container glass-card">
-                <h3>Live Attack Map</h3>
-                <div class="world-map" id="worldMap">
-                    <svg viewBox="0 0 1000 500" id="mapSvg">
-                        <!-- World map will be loaded here -->
-                    </svg>
-                    <div class="map-overlay" id="mapOverlay"></div>
-                </div>
-            </div>
-
-            <!-- Live Feed -->
+            <!-- Live Feed (moved higher) -->
             <div class="feed-container glass-card">
                 <div class="feed-header">
                     <h3>Live Attack Feed</h3>
@@ -84,6 +76,17 @@
                             <!-- Attack rows will be inserted here -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Attack Map -->
+            <div class="map-container glass-card">
+                <h3>Live Attack Map</h3>
+                <div class="world-map" id="worldMap">
+                    <svg viewBox="0 0 1000 500" id="mapSvg">
+                        <!-- World map will be loaded here -->
+                    </svg>
+                    <div class="map-overlay" id="mapOverlay"></div>
                 </div>
             </div>
         </main>
