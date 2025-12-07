@@ -144,6 +144,38 @@ impl Database {
         Ok(rows)
     }
 
+    pub async fn get_recent_events(&self, limit: i32) -> Result<Vec<AttackEvent>> {
+        let rows: Vec<(i64, i64, String, Option<String>, Option<f64>, Option<f64>, String, i32, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+            r#"
+            SELECT id, timestamp, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password
+            FROM requests
+            ORDER BY id DESC
+            LIMIT ?
+            "#
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        Ok(rows.into_iter().map(|(id, ts, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password)| {
+            AttackEvent {
+                id: Some(id),
+                timestamp: chrono::DateTime::from_timestamp_millis(ts).unwrap_or_else(|| Utc::now()),
+                ip,
+                country_code,
+                latitude,
+                longitude,
+                service,
+                port: port as u16,
+                request: request.unwrap_or_default(),
+                payload,
+                http_path,
+                username,
+                password,
+            }
+        }).collect())
+    }
+
     pub async fn get_service_stats(&self, since_hours: i64) -> Result<Vec<ServiceStat>> {
         let since = Utc::now().timestamp_millis() - (since_hours * 3600 * 1000);
         let rows: Vec<(String, i64)> = sqlx::query_as(

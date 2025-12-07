@@ -42,6 +42,14 @@ class HoneypotDashboard {
 
             // Show recent credentials
             this.updateCredentialsList(data.credentials);
+
+            // Populate table with recent events (oldest first so newest ends up on top)
+            if (data.events && data.events.length > 0) {
+                const reversedEvents = [...data.events].reverse();
+                for (const event of reversedEvents) {
+                    this.addTableRow(event, false); // false = no animation
+                }
+            }
         } catch (error) {
             console.error('Failed to load initial data:', error);
         }
@@ -98,9 +106,11 @@ class HoneypotDashboard {
         }
     }
 
-    addTableRow(event) {
+    addTableRow(event, animate = true) {
         const row = document.createElement('tr');
-        row.className = 'new-row';
+        if (animate) {
+            row.className = 'new-row';
+        }
         row.dataset.event = JSON.stringify(event);
 
         const time = new Date(event.timestamp).toLocaleTimeString();
@@ -130,7 +140,9 @@ class HoneypotDashboard {
         }
 
         // Remove animation class after animation completes
-        setTimeout(() => row.classList.remove('new-row'), 300);
+        if (animate) {
+            setTimeout(() => row.classList.remove('new-row'), 300);
+        }
     }
 
     getServiceClass(service) {

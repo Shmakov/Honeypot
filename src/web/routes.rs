@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::AppState;
-use crate::db::{CountryStat, CredentialStat, PathStat, ServiceStat};
+use crate::db::{AttackEvent, CountryStat, CredentialStat, PathStat, ServiceStat};
 
 /// Serve the main dashboard page
 pub async fn index() -> Html<&'static str> {
@@ -61,12 +61,14 @@ pub async fn api_stats(
 pub struct RecentResponse {
     pub total: i64,
     pub credentials: Vec<CredentialStat>,
+    pub events: Vec<AttackEvent>,
 }
 
-/// API: Get recent data for dashboard
+/// API: Get recent data for dashboard (includes recent events)
 pub async fn api_recent(State(state): State<Arc<AppState>>) -> Json<RecentResponse> {
     let total = state.db.get_total_count().await.unwrap_or(0);
     let creds = state.db.get_recent_credentials(10).await.unwrap_or_default();
+    let events = state.db.get_recent_events(25).await.unwrap_or_default();
     
     let credentials: Vec<CredentialStat> = creds
         .into_iter()
@@ -77,7 +79,7 @@ pub async fn api_recent(State(state): State<Arc<AppState>>) -> Json<RecentRespon
         })
         .collect();
 
-    Json(RecentResponse { total, credentials })
+    Json(RecentResponse { total, credentials, events })
 }
 
 /// API: Get country statistics
