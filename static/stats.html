@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistics - Honeypot</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🍯</span>
+                <span class="logo-text">Honeypot</span>
+            </div>
+            <nav class="nav">
+                <a href="/" class="nav-link">Live Feed</a>
+                <a href="/stats" class="nav-link active">Statistics</a>
+            </nav>
+            <div class="time-filter">
+                <select id="timeRange">
+                    <option value="24">Last 24 Hours</option>
+                    <option value="168">Last 7 Days</option>
+                    <option value="720" selected>Last 30 Days</option>
+                    <option value="8760">Last Year</option>
+                </select>
+            </div>
+        </header>
+
+        <main class="main stats-page">
+            <!-- Overview Cards -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalAttacks">-</div>
+                    <div class="stat-label">Total Attacks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uniqueServices">-</div>
+                    <div class="stat-label">Services Targeted</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="uniqueCredentials">-</div>
+                    <div class="stat-label">Unique Credentials</div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-row">
+                <div class="chart-container glass-card">
+                    <h3>Attacks by Service</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="servicesChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-container glass-card">
+                    <h3>Attacks by Country</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="countriesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tables Row -->
+            <div class="tables-row">
+                <div class="table-container glass-card">
+                    <h3>Top SSH/FTP Credentials</h3>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Password</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody id="credentialsTable">
+                                <tr>
+                                    <td colspan="3">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="table-container glass-card">
+                    <h3>Top HTTP Paths</h3>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Path</th>
+                                    <th>Count</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pathsTable">
+                                <tr>
+                                    <td colspan="2">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/stats.js"></script>
+</body>
+
+</html>

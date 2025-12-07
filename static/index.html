@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honeypot Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🍯</span>
+                <span class="logo-text">Honeypot</span>
+            </div>
+            <nav class="nav">
+                <a href="/" class="nav-link active">Live Feed</a>
+                <a href="/stats" class="nav-link">Statistics</a>
+            </nav>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- Stats Cards -->
+            <div class="stats-cards">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRequests">-</div>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="sessionRequests">0</div>
+                    <div class="stat-label">This Session</div>
+                </div>
+                <div class="stat-card credentials-card">
+                    <div class="stat-label">Recent Credentials</div>
+                    <div class="credentials-list" id="recentCredentials">
+                        <div class="credential-item">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Attack Map -->
+            <div class="map-container glass-card">
+                <h3>Live Attack Map</h3>
+                <div class="world-map" id="worldMap">
+                    <svg viewBox="0 0 1000 500" id="mapSvg">
+                        <!-- World map will be loaded here -->
+                    </svg>
+                    <div class="map-overlay" id="mapOverlay"></div>
+                </div>
+            </div>
+
+            <!-- Live Feed -->
+            <div class="feed-container glass-card">
+                <div class="feed-header">
+                    <h3>Live Attack Feed</h3>
+                    <div class="feed-controls">
+                        <button class="btn-icon" id="pauseBtn" title="Pause">⏸</button>
+                        <button class="btn-icon" id="clearBtn" title="Clear">🗑</button>
+                    </div>
+                </div>
+                <div class="feed-table-wrapper">
+                    <table class="feed-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>IP</th>
+                                <th>Country</th>
+                                <th>Service</th>
+                                <th>Request</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feedBody">
+                            <!-- Attack rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- Payload Modal -->
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal glass-card">
+                <div class="modal-header">
+                    <h3 id="modalTitle">Request Details</h3>
+                    <button class="btn-icon modal-close" id="modalClose">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="detail-row">
+                        <span class="detail-label">IP Address:</span>
+                        <span class="detail-value" id="detailIp">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Country:</span>
+                        <span class="detail-value" id="detailCountry">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Service:</span>
+                        <span class="detail-value" id="detailService">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Port:</span>
+                        <span class="detail-value" id="detailPort">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Timestamp:</span>
+                        <span class="detail-value" id="detailTime">-</span>
+                    </div>
+                    <div class="detail-row" id="credentialsRow" style="display: none;">
+                        <span class="detail-label">Credentials:</span>
+                        <span class="detail-value" id="detailCredentials">-</span>
+                    </div>
+                    <div class="payload-section">
+                        <span class="detail-label">Payload:</span>
+                        <pre class="payload-content" id="detailPayload">No payload captured</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/app.js"></script>
+</body>
+</html>

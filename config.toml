@@ -1,0 +1,31 @@
+# Server configuration
+[server]
+host = "0.0.0.0"
+http_port = 80
+https_port = 443
+
+# TLS (optional - set cert paths to enable)
+tls_cert = ""
+tls_key = ""
+
+# Database
+[database]
+# "sqlite" or "postgres"
+driver = "sqlite"
+# For SQLite: path to database file
+# For PostgreSQL: connection string
+url = "honeypot.db"
+
+# GeoIP database path (MaxMind GeoLite2-City.mmdb)
+[geoip]
+database = "data/GeoLite2-City.mmdb"
+
+# Logging
+[logging]
+level = "info"
+
+# Protocol emulation settings
+[emulation]
+ssh_banner = "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.4"
+ftp_banner = "220 FTP Server ready."
+mysql_version = "5.7.42-0ubuntu0.18.04.1"
