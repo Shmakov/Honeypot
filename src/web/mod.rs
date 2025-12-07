@@ -5,11 +5,9 @@ mod sse;
 
 use anyhow::Result;
 use axum::{
-    body::Body,
     extract::{ConnectInfo, Request, State},
     http::StatusCode,
-    middleware::{self, Next},
-    response::{IntoResponse, Response},
+    response::IntoResponse,
     routing::{any, get},
     Router,
 };
@@ -27,42 +25,43 @@ pub struct AppState {
     pub config: Config,
 }
 
-/// Middleware to log all HTTP requests as attack events
-async fn log_request(
+/// Log an HTTP request as an attack event
+async fn log_http_event(state: &AppState, ip: String, method: &str, uri: &str) {
+    let request_str = format!("{} {}", method, uri);
+    let mut event = AttackEvent::new(
+        ip.clone(),
+        "http".to_string(),
+        80,
+        request_str,
+    );
+    event.http_path = Some(uri.to_string());
+    
+    if let Err(e) = state.db.insert_event(&event).await {
+        tracing::warn!("Failed to store HTTP event: {}", e);
+    }
+    state.event_bus.publish(event);
+    
+    tracing::info!("HTTP {} {} from {}", method, uri, ip);
+}
+
+/// Handler for homepage - serves page AND logs the request
+async fn index_with_log(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    request: Request,
-    next: Next,
-) -> Response {
-    let method = request.method().to_string();
-    let uri = request.uri().to_string();
+) -> impl IntoResponse {
     let ip = addr.ip().to_string();
-    
-    // Only skip internal endpoints (static files, SSE stream, API)
-    let should_log = !uri.starts_with("/static") 
-        && !uri.starts_with("/events") 
-        && !uri.starts_with("/api");
-    
-    if should_log {
-        let request_str = format!("{} {}", method, uri);
-        let mut event = AttackEvent::new(
-            ip.clone(),
-            "http".to_string(),
-            80,
-            request_str,
-        );
-        event.http_path = Some(uri.clone());
-        
-        // Log and broadcast
-        if let Err(e) = state.db.insert_event(&event).await {
-            tracing::warn!("Failed to store HTTP event: {}", e);
-        }
-        state.event_bus.publish(event);
-        
-        tracing::info!("HTTP {} {} from {}", method, uri, ip);
-    }
-    
-    next.run(request).await
+    log_http_event(&state, ip, "GET", "/").await;
+    routes::index().await
+}
+
+/// Handler for stats page - serves page AND logs the request
+async fn stats_with_log(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    let ip = addr.ip().to_string();
+    log_http_event(&state, ip, "GET", "/stats").await;
+    routes::stats_page().await
 }
 
 /// Handler for all unknown paths - log as attack and return fake response
@@ -75,22 +74,7 @@ async fn catch_all(
     let uri = request.uri().to_string();
     let ip = addr.ip().to_string();
     
-    let request_str = format!("{} {}", method, uri);
-    let mut event = AttackEvent::new(
-        ip.clone(),
-        "http".to_string(),
-        80,
-        request_str,
-    );
-    event.http_path = Some(uri.clone());
-    
-    // Log and broadcast
-    if let Err(e) = state.db.insert_event(&event).await {
-        tracing::warn!("Failed to store HTTP event: {}", e);
-    }
-    state.event_bus.publish(event);
-    
-    tracing::info!("HTTP {} {} from {} -> 404", method, uri, ip);
+    log_http_event(&state, ip, &method, &uri).await;
     
     // Return a plausible 404 response
     (StatusCode::NOT_FOUND, "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL was not found on this server.</p></body></html>")
@@ -104,21 +88,19 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database) ->
     });
 
     let app = Router::new()
-        // Pages
-        .route("/", get(routes::index))
-        .route("/stats", get(routes::stats_page))
-        // SSE endpoint
+        // Pages (with logging)
+        .route("/", get(index_with_log))
+        .route("/stats", get(stats_with_log))
+        // SSE endpoint (no logging - internal)
         .route("/events", get(sse::events_handler))
-        // API endpoints
+        // API endpoints (no logging - internal)
         .route("/api/stats", get(routes::api_stats))
         .route("/api/recent", get(routes::api_recent))
         .route("/api/countries", get(routes::api_countries))
-        // Static files
+        // Static files (no logging - assets)
         .nest_service("/static", ServeDir::new("static"))
         // Catch-all for any other path - log as attack
         .fallback(any(catch_all))
-        // Add logging middleware
-        .layer(middleware::from_fn_with_state(state.clone(), log_request))
         .with_state(state);
 
     let addr = format!("{}:{}", config.server.host, config.server.http_port);
