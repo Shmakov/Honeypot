@@ -140,6 +140,8 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         // Pages (with logging)
         .route("/", get(index_with_log))
         .route("/stats", get(stats_with_log))
+        // robots.txt (no logging)
+        .route("/robots.txt", get(routes::robots_txt))
         // SSE endpoint (no logging - internal)
         .route("/events", get(sse::events_handler))
         // API endpoints (no logging - internal)

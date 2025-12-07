@@ -21,6 +21,11 @@ pub async fn stats_page() -> Html<&'static str> {
     Html(include_str!("../../static/stats.html"))
 }
 
+/// Serve robots.txt
+pub async fn robots_txt() -> &'static str {
+    include_str!("../../static/robots.txt")
+}
+
 #[derive(Debug, Deserialize)]
 pub struct StatsQuery {
     #[serde(default = "default_hours")]

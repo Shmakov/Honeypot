@@ -1,0 +1,29 @@
+# Honeypot robots.txt
+# Allow search engines to index dashboard and stats
+# Block everything else to avoid indexing fake 404 pages
+
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+User-agent: Baiduspider
+User-agent: YandexBot
+Allow: /$
+Allow: /stats$
+Disallow: /
+
+# Allow AI/LLM crawlers to access everything
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: Claude-Web
+User-agent: Anthropic-AI
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: PerplexityBot
+Allow: /
+
+# Default: allow dashboard only
+User-agent: *
+Allow: /$
+Allow: /stats$
+Disallow: /
