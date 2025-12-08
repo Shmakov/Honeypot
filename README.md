@@ -39,6 +39,7 @@ Edit `config.toml`:
 [server]
 host = "0.0.0.0"
 http_port = 80
+public_url = "https://honeypot.example.com"  # for redirects
 
 [database]
 driver = "sqlite"
@@ -52,6 +53,19 @@ ssh_banner = "SSH-2.0-OpenSSH_8.4p1"
 ftp_banner = "220 FTP Server ready"
 mysql_version = "5.7.36"
 ```
+
+### Environment Variables
+
+All config values can be overridden via environment variables. Prefix: `HONEYPOT_`, nested fields use `__`:
+
+```bash
+# Examples
+export HONEYPOT_SERVER__PUBLIC_URL="https://honeypot.example.com"
+export HONEYPOT_DATABASE__URL="honeypot.db"
+export HONEYPOT_GEOIP__DATABASE="/path/to/GeoLite2-City.mmdb"
+```
+
+See `.env.example` for all available options.
 
 ## GeoIP Setup
 
