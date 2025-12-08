@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Background -->
+  <rect width="180" height="180" rx="40" fill="#1a1a2e"/>
+  <!-- Honey pot body -->
+  <path d="M50 80 L50 130 Q50 155 90 155 Q130 155 130 130 L130 80 Z" fill="#f59e0b"/>
+  <!-- Pot rim -->
+  <rect x="40" y="68" width="100" height="18" rx="6" fill="#fcd34d"/>
+  <!-- Honey drip top -->
+  <ellipse cx="90" cy="55" rx="40" ry="18" fill="#fcd34d"/>
+  <!-- Highlight -->
+  <ellipse cx="65" cy="105" rx="12" ry="20" fill="#fcd34d" opacity="0.4"/>
+</svg>
