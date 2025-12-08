@@ -3,5 +3,11 @@
 /config.js
 
 # Added by cargo
-
 /target
+
+# Data files (download separately)
+/data/*.mmdb
+*.db
+
+# Environment
+.env
