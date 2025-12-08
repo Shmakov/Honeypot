@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::AppState;
-use crate::db::{AttackEvent, CountryStat, CredentialStat, PathStat, ServiceStat};
+use crate::db::{AttackEvent, CountryStat, CredentialStat, LocationStat, PathStat, ServiceStat};
 
 /// Serve the main dashboard page
 pub async fn index() -> Html<&'static str> {
@@ -94,4 +94,13 @@ pub async fn api_countries(
 ) -> Json<Vec<CountryStat>> {
     let countries = state.db.get_country_stats(query.hours).await.unwrap_or_default();
     Json(countries)
+}
+
+/// API: Get location data for map (lat/lng clusters with counts, max 500 points)
+pub async fn api_locations(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<StatsQuery>,
+) -> Json<Vec<LocationStat>> {
+    let locations = state.db.get_location_stats(query.hours, 500).await.unwrap_or_default();
+    Json(locations)
 }

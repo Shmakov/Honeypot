@@ -109,6 +109,9 @@ impl Database {
         sqlx::query(schema::CREATE_INDEX_TIMESTAMP_SERVICE)
             .execute(&self.pool)
             .await?;
+        sqlx::query(schema::CREATE_INDEX_LOCATION)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
@@ -290,4 +293,39 @@ pub struct PathStat {
 pub struct CountryStat {
     pub country_code: String,
     pub count: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct LocationStat {
+    pub lat: f64,
+    pub lon: f64,
+    pub count: i64,
+}
+
+impl Database {
+    /// Get location data aggregated by rounded lat/lng for map display (performant for large datasets)
+    pub async fn get_location_stats(&self, since_hours: i64, limit: i32) -> Result<Vec<LocationStat>> {
+        let since = Utc::now().timestamp_millis() - (since_hours * 3600 * 1000);
+        
+        // Round lat/lng to 1 decimal place (~11km precision) for clustering
+        let rows: Vec<(f64, f64, i64)> = sqlx::query_as(
+            r#"
+            SELECT 
+                ROUND(latitude, 1) as lat, 
+                ROUND(longitude, 1) as lon, 
+                COUNT(*) as count 
+            FROM requests 
+            WHERE timestamp > ? AND latitude IS NOT NULL AND longitude IS NOT NULL 
+            GROUP BY ROUND(latitude, 1), ROUND(longitude, 1) 
+            ORDER BY count DESC 
+            LIMIT ?
+            "#
+        )
+        .bind(since)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        Ok(rows.into_iter().map(|(lat, lon, count)| LocationStat { lat, lon, count }).collect())
+    }
 }

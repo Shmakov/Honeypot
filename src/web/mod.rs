@@ -211,6 +211,7 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         .route("/api/stats", get(routes::api_stats))
         .route("/api/recent", get(routes::api_recent))
         .route("/api/countries", get(routes::api_countries))
+        .route("/api/locations", get(routes::api_locations))
         // Static files (no logging - assets)
         .nest_service("/static", ServeDir::new("static"))
         // Catch-all for any other path - log as attack

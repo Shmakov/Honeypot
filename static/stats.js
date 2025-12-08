@@ -60,58 +60,41 @@ class StatsPage {
         }
     }
 
-    updateMapMarkers(countries) {
+    updateMapMarkers(locations) {
         if (!statsMap) return;
 
         // Clear existing markers
         countryMarkers.forEach(m => statsMap.removeLayer(m));
         countryMarkers = [];
 
-        // Country centroids (approximate lat/lng)
-        const centroids = {
-            'US': [39.8, -98.6], 'CN': [35.9, 104.2], 'RU': [61.5, 105.3], 'BR': [-14.2, -51.9],
-            'IN': [20.6, 79.0], 'DE': [51.2, 10.5], 'GB': [55.4, -3.4], 'FR': [46.6, 2.4],
-            'JP': [36.2, 138.3], 'KR': [35.9, 127.8], 'NL': [52.1, 5.3], 'VN': [16.0, 108.0],
-            'ID': [-0.8, 113.9], 'TW': [23.7, 121.0], 'SG': [1.3, 103.8], 'HK': [22.4, 114.1],
-            'AU': [-25.3, 133.8], 'CA': [56.1, -106.3], 'MX': [23.6, -102.6], 'IT': [41.9, 12.6],
-            'ES': [40.5, -3.7], 'PL': [51.9, 19.1], 'UA': [48.4, 31.2], 'TH': [15.9, 100.9],
-            'PH': [12.9, 121.8], 'MY': [4.2, 101.9], 'AR': [-38.4, -63.6], 'ZA': [-30.6, 22.9],
-            'EG': [26.8, 30.8], 'TR': [38.9, 35.2], 'IR': [32.4, 53.7], 'PK': [30.4, 69.3],
-            'BD': [23.7, 90.4], 'NG': [9.1, 8.7], 'CO': [4.6, -74.3], 'CL': [-35.7, -71.5]
-        };
+        if (!locations || locations.length === 0) return;
 
-        const maxCount = Math.max(...countries.map(c => c.count), 1);
+        const maxCount = Math.max(...locations.map(l => l.count), 1);
 
-        countries.slice(0, 20).forEach(country => {
-            const coords = centroids[country.country_code];
-            if (!coords) return;
+        locations.forEach(loc => {
+            // Skip invalid coordinates
+            if (loc.lat == null || loc.lon == null) return;
 
-            const size = Math.max(15, Math.min(50, (country.count / maxCount) * 50));
-            const opacity = Math.max(0.4, Math.min(0.9, (country.count / maxCount) * 0.9));
+            // Size based on count (min 6px, max 24px)
+            const size = Math.max(6, Math.min(24, Math.sqrt(loc.count / maxCount) * 24));
+            const opacity = Math.max(0.5, Math.min(0.9, Math.sqrt(loc.count / maxCount) * 0.9));
 
             const icon = L.divIcon({
-                className: 'country-marker',
+                className: 'location-marker',
                 html: `<div style="
                     width: ${size}px;
                     height: ${size}px;
                     background: rgba(239, 68, 68, ${opacity});
                     border-radius: 50%;
-                    box-shadow: 0 0 ${size / 2}px rgba(239, 68, 68, 0.5);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: ${Math.max(10, size / 3)}px;
-                    font-weight: 600;
-                    color: white;
-                ">${country.count > 999 ? Math.floor(country.count / 1000) + 'k' : country.count}</div>`,
+                    box-shadow: 0 0 ${size}px rgba(239, 68, 68, 0.6);
+                "></div>`,
                 iconSize: [size, size],
                 iconAnchor: [size / 2, size / 2]
             });
 
-            const marker = L.marker(coords, { icon })
+            const marker = L.marker([loc.lat, loc.lon], { icon })
                 .bindPopup(`<div style="font-family: inherit; text-align: center;">
-                    <strong style="font-size: 16px;">${country.country_code}</strong><br>
-                    <span style="color: #888;">${country.count.toLocaleString()} attacks</span>
+                    <span style="color: #888;">${loc.count.toLocaleString()} requests</span>
                 </div>`)
                 .addTo(statsMap);
 
@@ -128,13 +111,15 @@ class StatsPage {
         const hours = document.getElementById('timeRange').value;
 
         try {
-            const [statsResponse, countriesResponse] = await Promise.all([
+            const [statsResponse, countriesResponse, locationsResponse] = await Promise.all([
                 fetch(`/api/stats?hours=${hours}`),
-                fetch(`/api/countries?hours=${hours}`)
+                fetch(`/api/countries?hours=${hours}`),
+                fetch(`/api/locations?hours=${hours}`)
             ]);
 
             const stats = await statsResponse.json();
             const countries = await countriesResponse.json();
+            const locations = await locationsResponse.json();
 
             this.countriesData = countries;
             this.updateOverview(stats, countries);
@@ -142,7 +127,7 @@ class StatsPage {
             this.updateCountriesChart(countries);
             this.updateCredentialsTable(stats.credentials);
             this.updatePathsTable(stats.paths);
-            this.updateMapMarkers(countries);
+            this.updateMapMarkers(locations);
 
         } catch (error) {
             console.error('Failed to load stats:', error);

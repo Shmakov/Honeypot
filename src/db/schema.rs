@@ -37,3 +37,7 @@ pub const CREATE_INDEX_HTTP_PATH: &str =
 // Composite index for time-based stats queries
 pub const CREATE_INDEX_TIMESTAMP_SERVICE: &str = 
     "CREATE INDEX IF NOT EXISTS idx_requests_ts_service ON requests(timestamp, service)";
+
+// Index for location queries (map data)
+pub const CREATE_INDEX_LOCATION: &str = 
+    "CREATE INDEX IF NOT EXISTS idx_requests_location ON requests(timestamp, latitude, longitude)";
