@@ -102,6 +102,53 @@ async fn stats_with_log(
     routes::stats_page().await
 }
 
+/// Handler for static files - serves file AND logs the request
+async fn static_with_log(
+    State(state): State<Arc<AppState>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    axum::extract::Path(path): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let ip = addr.ip().to_string();
+    let full_path = format!("/static/{}", path);
+    log_http_event(&state, ip, "GET", &full_path, &headers, None).await;
+    
+    // Serve the static file
+    let file_path = format!("static/{}", path);
+    match tokio::fs::read(&file_path).await {
+        Ok(contents) => {
+            // Determine content type from extension
+            let content_type = if path.ends_with(".js") {
+                "application/javascript"
+            } else if path.ends_with(".css") {
+                "text/css"
+            } else if path.ends_with(".html") {
+                "text/html"
+            } else if path.ends_with(".svg") {
+                "image/svg+xml"
+            } else if path.ends_with(".png") {
+                "image/png"
+            } else if path.ends_with(".ico") {
+                "image/x-icon"
+            } else {
+                "application/octet-stream"
+            };
+            
+            axum::response::Response::builder()
+                .status(StatusCode::OK)
+                .header("Content-Type", content_type)
+                .body(axum::body::Body::from(contents))
+                .unwrap()
+        }
+        Err(_) => {
+            axum::response::Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(axum::body::Body::from("Not Found"))
+                .unwrap()
+        }
+    }
+}
+
 /// Handler for all unknown paths - log as attack, echo request, redirect to home
 async fn catch_all(
     State(state): State<Arc<AppState>>,
@@ -212,8 +259,8 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         .route("/api/recent", get(routes::api_recent))
         .route("/api/countries", get(routes::api_countries))
         .route("/api/locations", get(routes::api_locations))
-        // Static files (no logging - assets)
-        .nest_service("/static", ServeDir::new("static"))
+        // Static files (with logging)
+        .route("/static/*path", get(static_with_log))
         // Catch-all for any other path - log as attack
         .fallback(any(catch_all))
         .with_state(state);
