@@ -13,6 +13,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 # Web framework
 axum = { version = "0.7", features = ["macros"] }
 axum-extra = { version = "0.9", features = ["typed-header"] }
+axum-server = { version = "0.7", features = ["tls-rustls"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
 

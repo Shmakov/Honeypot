@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 use serde::Deserialize;
-use std::path::Path;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {

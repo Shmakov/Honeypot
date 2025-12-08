@@ -10,7 +10,6 @@ use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 
 use super::AppState;
-use crate::db::AttackEvent;
 
 pub async fn events_handler(
     State(state): State<Arc<AppState>>,

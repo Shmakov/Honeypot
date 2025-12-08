@@ -56,6 +56,9 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
     (7002, "weblogic"), (8001, "http-alt"), (8082, "http-alt"), (8083, "http-alt"),
     (8084, "http-alt"), (8085, "http-alt"), (8086, "influxdb"), (8087, "http-alt"),
     (8089, "splunk"), (9001, "tor"), (9002, "dynamid"), (9003, "unknown"),
+    // Complete to 128 ports
+    (4444, "krb524"), (5222, "xmpp"), (5269, "xmpp-server"), (8088, "radan-http"),
+    (8181, "http-alt"), (8880, "cddbp-alt"), (9080, "glrpc"), (9443, "tungsten-https"),
 ];
 
 /// Start all protocol handlers

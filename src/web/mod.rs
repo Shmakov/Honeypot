@@ -217,14 +217,31 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         .fallback(any(catch_all))
         .with_state(state);
 
-    let addr = format!("{}:{}", config.server.host, config.server.http_port);
-    info!("Web server starting on http://{}", addr);
+    // Check if TLS is enabled
+    if config.tls_enabled() {
+        // Start HTTPS server
+        let https_addr = format!("{}:{}", config.server.host, config.server.https_port);
+        info!("Web server starting on https://{}", https_addr);
+        
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem_file(
+            &config.server.tls_cert,
+            &config.server.tls_key,
+        ).await?;
+        
+        axum_server::bind_rustls(https_addr.parse()?, tls_config)
+            .serve(app.into_make_service_with_connect_info::<SocketAddr>())
+            .await?;
+    } else {
+        // Start HTTP server
+        let addr = format!("{}:{}", config.server.host, config.server.http_port);
+        info!("Web server starting on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(
-        listener, 
-        app.into_make_service_with_connect_info::<SocketAddr>()
-    ).await?;
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        axum::serve(
+            listener, 
+            app.into_make_service_with_connect_info::<SocketAddr>()
+        ).await?;
+    }
 
     Ok(())
 }

@@ -1,0 +1,15 @@
+# Ignore everything
+*
+
+# Allow source code
+!Cargo.toml
+!Cargo.lock
+!src/**
+!static/**
+!config.toml
+
+# Ignore generated/local files
+*.db
+*.mmdb
+.env
+target/

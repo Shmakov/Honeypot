@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  honeypot:
+    build: .
+    container_name: honeypot
+    restart: unless-stopped
+    
+    # Required capabilities for low ports and ICMP
+    cap_add:
+      - NET_BIND_SERVICE
+      - NET_RAW
+    
+    # Network mode host for capturing real client IPs
+    # and binding to all required ports
+    network_mode: host
+    
+    volumes:
+      # Persist database
+      - ./honeypot.db:/app/honeypot.db
+      # GeoIP database (download separately)
+      - ./data/GeoLite2-City.mmdb:/app/data/GeoLite2-City.mmdb:ro
+      # Custom config (optional)
+      - ./config.toml:/app/config.toml:ro
+    
+    environment:
+      # Override config via environment
+      - HONEYPOT_SERVER__PUBLIC_URL=${PUBLIC_URL:-http://localhost}
+      - HONEYPOT_LOGGING__LEVEL=${LOG_LEVEL:-info}
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
