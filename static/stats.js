@@ -150,7 +150,7 @@ class StatsPage {
     }
 
     updateOverview(stats, countries) {
-        document.getElementById('totalAttacks').textContent = stats.total.toLocaleString();
+        document.getElementById('totalRequests').textContent = stats.total.toLocaleString();
         document.getElementById('uniqueServices').textContent = stats.services.length;
         document.getElementById('uniqueCountries').textContent = countries.length;
 

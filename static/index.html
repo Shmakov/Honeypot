@@ -91,7 +91,7 @@
             <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
                     <div class="flex items-center gap-3">
-                        <h3 class="text-lg font-semibold text-white">Live Attack Feed</h3>
+                        <h3 class="text-lg font-semibold text-white">Live Request Feed</h3>
                         <div id="connectionStatus"
                             class="flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-800/50">
                             <span class="status-dot w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
@@ -119,16 +119,16 @@
                             </tr>
                         </thead>
                         <tbody id="feedBody" class="divide-y divide-gray-800">
-                            <!-- Attack rows inserted here -->
+                            <!-- Request rows inserted here -->
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- Attack Map -->
+            <!-- Request Map -->
             <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-800">
-                    <h3 class="text-lg font-semibold text-white">Live Attack Map</h3>
+                    <h3 class="text-lg font-semibold text-white">Live Request Map</h3>
                 </div>
                 <div id="attackMap" class="h-80"></div>
             </div>
@@ -144,7 +144,7 @@
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800/50 bg-gray-900/50">
                     <div class="flex items-center gap-3">
                         <span class="text-xl">🔍</span>
-                        <h3 class="text-lg font-semibold text-white">Attack Details</h3>
+                        <h3 class="text-lg font-semibold text-white">Request Details</h3>
                     </div>
                     <button id="modalClose"
                         class="p-2 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-white">
@@ -218,6 +218,13 @@
                 </div>
             </div>
         </div>
+
+        <!-- Footer -->
+        <footer class="max-w-7xl mx-auto px-6 lg:px-8 py-8 text-center text-gray-600 text-sm">
+            Honeypot Dashboard •
+            <a href="https://github.com/Shmakov/Honeypot" target="_blank"
+                class="hover:text-gray-400 transition-colors">GitHub</a>
+        </footer>
     </div>
 
     <script src="/static/theme.js"></script>
