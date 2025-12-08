@@ -161,31 +161,33 @@
 }
 
 /* ===== LIGHT THEME ===== */
-/* Apply to body when data-theme="light" is on html */
+/* Professional light theme with proper contrast and shadows */
 [data-theme="light"] {
-    /* Override body */
-    background-color: #f8fafc !important;
-    color: #1e293b !important;
+    /* Override body - warm white */
+    background-color: #f5f7fa !important;
+    color: #1a202c !important;
 }
 
 [data-theme="light"] body {
-    background-color: #f8fafc !important;
-    color: #1e293b !important;
+    background-color: #f5f7fa !important;
+    color: #1a202c !important;
 }
 
-/* Header */
+/* Header - clean white with shadow */
 [data-theme="light"] header {
-    background-color: rgba(255, 255, 255, 0.9) !important;
+    background-color: rgba(255, 255, 255, 0.95) !important;
     border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Cards and containers - using attribute selectors */
+/* Cards - white with subtle shadow for depth */
 [data-theme="light"] [class*="bg-gray-900"] {
     background-color: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
 }
 
 [data-theme="light"] [class*="bg-gray-950"] {
-    background-color: #f1f5f9 !important;
+    background-color: #f8fafc !important;
 }
 
 [data-theme="light"] [class*="bg-gray-800"] {
@@ -196,35 +198,68 @@
     --tw-gradient-from: #ffffff !important;
 }
 
-[data-theme="light"] [class*="to-gray-900"] {
-    --tw-gradient-to: #f8fafc !important;
-}
-
+[data-theme="light"] [class*="to-gray-900"],
 [data-theme="light"] [class*="to-gray-950"] {
-    --tw-gradient-to: #f8fafc !important;
+    --tw-gradient-to: #fafbfc !important;
 }
 
-/* Borders */
+/* Borders - visible but not harsh */
 [data-theme="light"] [class*="border-gray-800"],
 [data-theme="light"] [class*="border-gray-700"] {
     border-color: #e2e8f0 !important;
 }
 
-/* Text colors */
+/* Text colors - proper dark tones for readability */
 [data-theme="light"] [class*="text-white"] {
-    color: #1e293b !important;
+    color: #1a202c !important;
 }
 
 [data-theme="light"] [class*="text-gray-100"] {
-    color: #334155 !important;
+    color: #2d3748 !important;
 }
 
 [data-theme="light"] [class*="text-gray-300"] {
-    color: #475569 !important;
+    color: #4a5568 !important;
 }
 
 [data-theme="light"] [class*="text-gray-400"] {
-    color: #64748b !important;
+    color: #718096 !important;
+}
+
+[data-theme="light"] [class*="text-gray-500"] {
+    color: #4a5568 !important;
+}
+
+/* Accent colors - MUCH darker for light mode visibility */
+/* Amber for usernames - dark gold */
+[data-theme="light"] [class*="text-amber-400"] {
+    color: #b45309 !important;
+}
+
+/* Red for passwords - dark red */
+[data-theme="light"] [class*="text-red-400"] {
+    color: #c53030 !important;
+}
+
+/* Blue for paths - dark blue */
+[data-theme="light"] [class*="text-blue-400"] {
+    color: #2b6cb0 !important;
+}
+
+/* Green for success - dark green */
+[data-theme="light"] [class*="text-green-400"],
+[data-theme="light"] [class*="text-green-500"] {
+    color: #276749 !important;
+}
+
+/* Purple for telnet badges */
+[data-theme="light"] [class*="text-purple-400"] {
+    color: #6b46c1 !important;
+}
+
+/* Cyan for mysql badges */
+[data-theme="light"] [class*="text-cyan-400"] {
+    color: #0e7490 !important;
 }
 
 /* Dividers */
@@ -233,43 +268,62 @@
     border-color: #e2e8f0 !important;
 }
 
-/* Table rows */
+/* Table rows - subtle hover */
 [data-theme="light"] #feedBody tr:hover {
-    background-color: rgba(59, 130, 246, 0.08) !important;
+    background-color: rgba(66, 153, 225, 0.08) !important;
 }
 
-/* Map */
+/* Stats tables hover */
+[data-theme="light"] tr.hover\:bg-gray-800\/30:hover {
+    background-color: rgba(66, 153, 225, 0.08) !important;
+}
+
+/* Map containers */
 [data-theme="light"] #attackMap,
 [data-theme="light"] #statsMap {
-    background: #e2e8f0 !important;
+    background: #e8ecf1 !important;
 }
 
 [data-theme="light"] .leaflet-container {
-    background: #e2e8f0 !important;
+    background: #e8ecf1 !important;
 }
 
 [data-theme="light"] .leaflet-popup-content-wrapper {
     background: #ffffff !important;
-    color: #1e293b !important;
+    color: #1a202c !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
 }
 
 [data-theme="light"] .leaflet-popup-tip {
     background: #ffffff !important;
 }
 
-/* Modal specific */
+/* Modal - white with shadow */
 [data-theme="light"] .modal {
-    background: linear-gradient(to bottom, #ffffff, #f8fafc) !important;
+    background: linear-gradient(to bottom, #ffffff, #fafbfc) !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
 }
 
 [data-theme="light"] .modal [class*="bg-gray-800"] {
-    background-color: #f1f5f9 !important;
+    background-color: #f7fafc !important;
 }
 
-/* Pre/code blocks in light theme */
-[data-theme="light"] pre[class*="bg-gray-950"] {
-    background-color: #f1f5f9 !important;
+/* Pre/code blocks - distinct background */
+[data-theme="light"] pre[class*="bg-gray-950"],
+[data-theme="light"] pre[class*="bg-gray-900"] {
+    background-color: #edf2f7 !important;
     border-color: #e2e8f0 !important;
+    color: #2d3748 !important;
+}
+
+/* Code text in pre - darker green for readability */
+[data-theme="light"] pre [class*="text-green-400"] {
+    color: #276749 !important;
+}
+
+/* Font mono elements */
+[data-theme="light"] .font-mono {
+    color: #2d3748 !important;
 }
 
 /* Scrollbar styling */
@@ -292,16 +346,39 @@
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #a0aec0;
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #718096;
 }
 
 /* Select dropdown in light mode */
 [data-theme="light"] select {
-    background-color: #f1f5f9 !important;
+    background-color: #ffffff !important;
     border-color: #e2e8f0 !important;
-    color: #1e293b !important;
+    color: #1a202c !important;
+}
+
+/* Button hover states */
+[data-theme="light"] button:hover {
+    background-color: #edf2f7 !important;
+}
+
+/* Charts legend text */
+[data-theme="light"] .chartjs-legend li {
+    color: #4a5568 !important;
+}
+
+/* Footer */
+[data-theme="light"] footer {
+    color: #718096 !important;
+}
+
+[data-theme="light"] footer a {
+    color: #4a5568 !important;
+}
+
+[data-theme="light"] footer a:hover {
+    color: #2d3748 !important;
 }
