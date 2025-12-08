@@ -3,6 +3,8 @@
 host = "0.0.0.0"
 http_port = 80
 https_port = 443
+# Public URL for redirects (include protocol, no trailing slash)
+public_url = "http://localhost"
 
 # TLS (optional - set cert paths to enable)
 tls_cert = ""

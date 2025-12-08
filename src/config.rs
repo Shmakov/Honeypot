@@ -20,6 +20,9 @@ pub struct ServerConfig {
     pub https_port: u16,
     pub tls_cert: String,
     pub tls_key: String,
+    /// Public URL for redirects (e.g., "https://honeypot.example.com")
+    #[serde(default)]
+    pub public_url: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

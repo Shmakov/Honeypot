@@ -25,6 +25,7 @@ pub struct AppState {
     pub event_bus: EventBus,
     pub db: Database,
     pub geoip: SharedGeoIp,
+    pub public_url: String,
 }
 
 /// Format HTTP headers as a readable string
@@ -101,7 +102,7 @@ async fn stats_with_log(
     routes::stats_page().await
 }
 
-/// Handler for all unknown paths - log as attack with full headers and body
+/// Handler for all unknown paths - log as attack, echo request, redirect to home
 async fn catch_all(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -123,10 +124,71 @@ async fn catch_all(
         None
     };
     
-    log_http_event(&state, ip, &method, &uri, &headers, body).await;
+    // Format headers for display
+    let headers_display = format_headers(&headers);
+    let body_display = body.as_ref()
+        .map(|b| String::from_utf8_lossy(b).to_string())
+        .unwrap_or_default();
     
-    // Return a plausible 404 response
-    (StatusCode::NOT_FOUND, "<!DOCTYPE html><html><head><title>404 Not Found</title></head><body><h1>Not Found</h1><p>The requested URL was not found on this server.</p></body></html>")
+    log_http_event(&state, ip.clone(), &method, &uri, &headers, body).await;
+    
+    // Determine redirect URL
+    let redirect_url = if state.public_url.is_empty() {
+        "/".to_string()
+    } else {
+        format!("{}/", state.public_url.trim_end_matches('/'))
+    };
+    
+    // Return echo response with meta redirect (200 OK to encourage bot interaction)
+    let html = format!(r#"<!DOCTYPE html>
+<html>
+<head>
+    <title>Request Received</title>
+    <meta http-equiv="refresh" content="3;url={redirect_url}">
+    <style>
+        body {{ font-family: monospace; background: #1a1a2e; color: #e0e0e0; padding: 20px; }}
+        h1 {{ color: #4ade80; }}
+        pre {{ background: #0d0d1a; padding: 15px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; }}
+        .label {{ color: #888; }}
+        .redirect {{ color: #fbbf24; margin-top: 20px; }}
+    </style>
+</head>
+<body>
+    <h1>Request Echo</h1>
+    <p class="label">Your IP:</p>
+    <pre>{ip}</pre>
+    <p class="label">Method:</p>
+    <pre>{method}</pre>
+    <p class="label">Path:</p>
+    <pre>{uri}</pre>
+    <p class="label">Headers:</p>
+    <pre>{headers_display}</pre>
+    {body_section}
+    <p class="redirect">Redirecting to homepage in 3 seconds...</p>
+    <script>setTimeout(function(){{ window.location.href = "{redirect_url}"; }}, 3000);</script>
+</body>
+</html>"#,
+        redirect_url = redirect_url,
+        ip = ip,
+        method = method,
+        uri = html_escape(&uri),
+        headers_display = html_escape(&headers_display),
+        body_section = if !body_display.is_empty() {
+            format!(r#"<p class="label">Body:</p><pre>{}</pre>"#, html_escape(&body_display))
+        } else {
+            String::new()
+        }
+    );
+    
+    (StatusCode::OK, axum::response::Html(html))
+}
+
+/// Escape HTML special characters
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp) -> Result<()> {
@@ -134,6 +196,7 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         event_bus,
         db,
         geoip,
+        public_url: config.server.public_url.clone(),
     });
 
     let app = Router::new()
