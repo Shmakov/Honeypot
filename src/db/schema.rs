@@ -26,3 +26,14 @@ pub const CREATE_INDEX_SERVICE: &str =
 
 pub const CREATE_INDEX_IP: &str = 
     "CREATE INDEX IF NOT EXISTS idx_requests_ip ON requests(ip)";
+
+// Additional indexes for stats queries (important for 100K+ rows)
+pub const CREATE_INDEX_COUNTRY: &str = 
+    "CREATE INDEX IF NOT EXISTS idx_requests_country ON requests(country_code)";
+
+pub const CREATE_INDEX_HTTP_PATH: &str = 
+    "CREATE INDEX IF NOT EXISTS idx_requests_http_path ON requests(http_path)";
+
+// Composite index for time-based stats queries
+pub const CREATE_INDEX_TIMESTAMP_SERVICE: &str = 
+    "CREATE INDEX IF NOT EXISTS idx_requests_ts_service ON requests(timestamp, service)";

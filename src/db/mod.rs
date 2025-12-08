@@ -99,6 +99,16 @@ impl Database {
         sqlx::query(schema::CREATE_INDEX_IP)
             .execute(&self.pool)
             .await?;
+        // Performance indexes for 100K+ rows
+        sqlx::query(schema::CREATE_INDEX_COUNTRY)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query(schema::CREATE_INDEX_HTTP_PATH)
+            .execute(&self.pool)
+            .await?;
+        sqlx::query(schema::CREATE_INDEX_TIMESTAMP_SERVICE)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
