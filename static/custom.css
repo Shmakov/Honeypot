@@ -382,3 +382,41 @@
 [data-theme="light"] footer a:hover {
     color: #2d3748 !important;
 }
+
+/* ===== LIGHT THEME SERVICE BADGES ===== */
+/* Colorful, vibrant badges with high contrast for light backgrounds */
+[data-theme="light"] .service-ssh {
+    background-color: rgba(220, 38, 38, 0.15) !important;
+    color: #b91c1c !important;
+    border: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+[data-theme="light"] .service-ftp {
+    background-color: rgba(217, 119, 6, 0.15) !important;
+    color: #b45309 !important;
+    border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="light"] .service-telnet {
+    background-color: rgba(124, 58, 237, 0.15) !important;
+    color: #6d28d9 !important;
+    border: 1px solid rgba(124, 58, 237, 0.3);
+}
+
+[data-theme="light"] .service-http {
+    background-color: rgba(37, 99, 235, 0.15) !important;
+    color: #1d4ed8 !important;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+[data-theme="light"] .service-mysql {
+    background-color: rgba(8, 145, 178, 0.15) !important;
+    color: #0e7490 !important;
+    border: 1px solid rgba(8, 145, 178, 0.3);
+}
+
+[data-theme="light"] .service-default {
+    background-color: rgba(75, 85, 99, 0.15) !important;
+    color: #374151 !important;
+    border: 1px solid rgba(75, 85, 99, 0.3);
+}
