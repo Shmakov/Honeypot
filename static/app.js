@@ -133,7 +133,7 @@ class HoneypotDashboard {
         row.innerHTML = `
             <td class="px-6 py-3 text-sm text-gray-400">${time}</td>
             <td class="px-6 py-3 font-mono text-sm text-gray-300">${this.escapeHtml(event.ip)}</td>
-            <td class="px-6 py-3 text-sm text-gray-400">${event.country_code || '-'}</td>
+            <td class="px-6 py-3 text-sm text-gray-400">${this.countryToFlag(event.country_code)} ${event.country_code || '-'}</td>
             <td class="px-6 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${serviceClass}">${service}</span></td>
             <td class="px-6 py-3 text-sm text-gray-400 font-mono truncate max-w-xs" title="${this.escapeHtml(requestFirstLine)}">${this.escapeHtml(this.truncate(requestFirstLine, 50))}</td>
         `;
@@ -169,6 +169,15 @@ class HoneypotDashboard {
             'mysql': 'service-mysql',
         };
         return map[service.toLowerCase()] || 'service-default';
+    }
+
+    // Convert country code to flag emoji (e.g., 'US' -> 🇺🇸)
+    countryToFlag(countryCode) {
+        if (!countryCode || countryCode.length !== 2) return '';
+        const code = countryCode.toUpperCase();
+        // Each letter is offset from 'A' (65) to regional indicator 'A' (127462)
+        const offset = 127397; // 127462 - 65
+        return String.fromCodePoint(...[...code].map(c => c.charCodeAt(0) + offset));
     }
 
     showEventDetails(event) {
