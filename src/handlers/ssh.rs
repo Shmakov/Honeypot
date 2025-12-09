@@ -23,7 +23,7 @@ pub async fn start(
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
-            debug!("Cannot bind SSH to {}: {}", addr, e);
+            warn!("Cannot bind SSH to {}: {} - skipping", addr, e);
             return Ok(());
         }
     };

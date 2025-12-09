@@ -43,7 +43,7 @@ pub async fn start(
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
-            debug!("Cannot bind to {}: {}", addr, e);
+            warn!("Cannot bind to {} ({}): {} - skipping", addr, service, e);
             return Ok(());
         }
     };

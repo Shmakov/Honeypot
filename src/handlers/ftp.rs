@@ -22,7 +22,7 @@ pub async fn start(
     let listener = match TcpListener::bind(&addr).await {
         Ok(l) => l,
         Err(e) => {
-            debug!("Cannot bind FTP to {}: {}", addr, e);
+            warn!("Cannot bind FTP to {}: {} - skipping", addr, e);
             return Ok(());
         }
     };
