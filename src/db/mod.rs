@@ -25,6 +25,7 @@ pub struct AttackEvent {
     pub http_path: Option<String>,
     pub username: Option<String>,
     pub password: Option<String>,
+    pub user_agent: Option<String>,
 }
 
 impl AttackEvent {
@@ -43,6 +44,7 @@ impl AttackEvent {
             http_path: None,
             username: None,
             password: None,
+            user_agent: None,
         }
     }
 
@@ -67,6 +69,11 @@ impl AttackEvent {
         self.country_code = Some(country_code);
         self.latitude = Some(lat);
         self.longitude = Some(lon);
+        self
+    }
+
+    pub fn with_user_agent(mut self, user_agent: String) -> Self {
+        self.user_agent = Some(user_agent);
         self
     }
 }
@@ -118,8 +125,8 @@ impl Database {
     pub async fn insert_event(&self, event: &AttackEvent) -> Result<i64> {
         let result = sqlx::query(
             r#"
-            INSERT INTO requests (timestamp, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO requests (timestamp, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(event.timestamp.timestamp_millis())
@@ -134,6 +141,7 @@ impl Database {
         .bind(&event.http_path)
         .bind(&event.username)
         .bind(&event.password)
+        .bind(&event.user_agent)
         .execute(&self.pool)
         .await?;
 
@@ -158,9 +166,9 @@ impl Database {
     }
 
     pub async fn get_recent_events(&self, limit: i32) -> Result<Vec<AttackEvent>> {
-        let rows: Vec<(i64, i64, String, Option<String>, Option<f64>, Option<f64>, String, i32, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
+        let rows: Vec<(i64, i64, String, Option<String>, Option<f64>, Option<f64>, String, i32, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
             r#"
-            SELECT id, timestamp, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password
+            SELECT id, timestamp, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password, user_agent
             FROM requests
             ORDER BY id DESC
             LIMIT ?
@@ -170,7 +178,7 @@ impl Database {
         .fetch_all(&self.pool)
         .await?;
         
-        Ok(rows.into_iter().map(|(id, ts, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password)| {
+        Ok(rows.into_iter().map(|(id, ts, ip, country_code, latitude, longitude, service, port, request, payload, http_path, username, password, user_agent)| {
             AttackEvent {
                 id: Some(id),
                 timestamp: chrono::DateTime::from_timestamp_millis(ts).unwrap_or_else(|| Utc::now()),
@@ -185,6 +193,7 @@ impl Database {
                 http_path,
                 username,
                 password,
+                user_agent,
             }
         }).collect())
     }

@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS requests (
     payload TEXT,
     http_path TEXT,
     username TEXT,
-    password TEXT
+    password TEXT,
+    user_agent TEXT
 )
 "#;
 

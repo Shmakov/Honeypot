@@ -52,6 +52,12 @@ async fn log_http_event(
     let headers_str = format_headers(headers);
     let request_str = format!("{} {}\n{}", method, uri, headers_str);
     
+    // Extract User-Agent header
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+    
     let mut event = AttackEvent::new(
         ip.clone(),
         "http".to_string(),
@@ -59,6 +65,11 @@ async fn log_http_event(
         request_str,
     );
     event.http_path = Some(uri.to_string());
+    
+    // Add User-Agent if present
+    if let Some(ua) = user_agent {
+        event = event.with_user_agent(ua);
+    }
     
     // Store body as payload if present
     if let Some(body_bytes) = body {

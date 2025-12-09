@@ -196,6 +196,15 @@ class HoneypotDashboard {
             credRow.style.display = 'none';
         }
 
+        // User-Agent
+        const uaRow = document.getElementById('userAgentRow');
+        if (event.user_agent) {
+            uaRow.classList.remove('hidden');
+            document.getElementById('detailUserAgent').textContent = event.user_agent;
+        } else {
+            uaRow.classList.add('hidden');
+        }
+
         // Request (contains method, path, headers)
         const requestEl = document.getElementById('detailRequest');
         if (event.request) {
