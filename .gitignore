@@ -8,6 +8,8 @@
 # Data files (download separately)
 /data/*.mmdb
 *.db
+*.db-shm
+*.db-wal
 
 # Environment
 .env
