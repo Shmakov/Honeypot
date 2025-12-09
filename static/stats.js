@@ -201,9 +201,9 @@ class StatsPage {
         this.charts.countries = new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: topCountries.map(c => c.country_code || 'Unknown'),
+                labels: topCountries.map(c => `${this.countryToFlag(c.country_code)} ${c.country_code || 'Unknown'}`),
                 datasets: [{
-                    label: 'Attacks',
+                    label: 'Requests',
                     data: topCountries.map(c => c.count),
                     backgroundColor: topCountries.map((_, i) => {
                         const opacity = 1 - (i * 0.08);
@@ -289,6 +289,14 @@ class StatsPage {
         const div = document.createElement('div');
         div.textContent = text || '';
         return div.innerHTML;
+    }
+
+    // Convert country code to flag emoji (e.g., 'US' -> 🇺🇸)
+    countryToFlag(countryCode) {
+        if (!countryCode || countryCode.length !== 2) return '';
+        const code = countryCode.toUpperCase();
+        const offset = 127397;
+        return String.fromCodePoint(...[...code].map(c => c.charCodeAt(0) + offset));
     }
 }
 

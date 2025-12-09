@@ -182,7 +182,7 @@ class HoneypotDashboard {
 
     showEventDetails(event) {
         document.getElementById('detailIp').textContent = event.ip;
-        document.getElementById('detailCountry').textContent = event.country_code || 'Unknown';
+        document.getElementById('detailCountry').textContent = `${this.countryToFlag(event.country_code)} ${event.country_code || 'Unknown'}`;
         document.getElementById('detailService').textContent = event.service;
         document.getElementById('detailPort').textContent = event.port || '-';
         document.getElementById('detailTime').textContent = new Date(event.timestamp).toLocaleString();
