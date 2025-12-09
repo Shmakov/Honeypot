@@ -60,11 +60,6 @@ impl AttackEvent {
         self
     }
 
-    pub fn with_payload_str(mut self, payload: String) -> Self {
-        self.payload = Some(payload);
-        self
-    }
-
     pub fn with_geo(mut self, country_code: String, lat: f64, lon: f64) -> Self {
         self.country_code = Some(country_code);
         self.latitude = Some(lat);
@@ -78,9 +73,7 @@ impl AttackEvent {
     }
 }
 
-fn hex_encode(data: &[u8]) -> String {
-    data.iter().map(|b| format!("{:02x}", b)).collect()
-}
+
 
 #[derive(Clone)]
 pub struct Database {
@@ -94,6 +87,14 @@ impl Database {
     }
 
     pub async fn run_migrations(&self) -> Result<()> {
+        // Enable WAL mode for better concurrency
+        sqlx::query("PRAGMA journal_mode=WAL")
+            .execute(&self.pool)
+            .await?;
+        sqlx::query("PRAGMA synchronous=NORMAL")
+            .execute(&self.pool)
+            .await?;
+        
         sqlx::query(schema::CREATE_TABLE)
             .execute(&self.pool)
             .await?;
@@ -213,6 +214,17 @@ impl Database {
             count,
             percentage: if total > 0 { (count as f64 / total as f64) * 100.0 } else { 0.0 },
         }).collect())
+    }
+
+    pub async fn get_unique_ips(&self, since_hours: i64) -> Result<i64> {
+        let since = Utc::now().timestamp_millis() - (since_hours * 3600 * 1000);
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(DISTINCT ip) FROM requests WHERE timestamp > ?"
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
     }
 
     pub async fn get_top_credentials(&self, since_hours: i64, limit: i32) -> Result<Vec<CredentialStat>> {

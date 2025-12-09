@@ -13,7 +13,6 @@ use axum::{
     Router,
 };
 use std::{net::SocketAddr, sync::Arc};
-use tower_http::services::ServeDir;
 use tracing::info;
 
 use crate::config::Config;

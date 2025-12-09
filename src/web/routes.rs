@@ -39,6 +39,7 @@ fn default_hours() -> i64 {
 #[derive(Debug, Serialize)]
 pub struct StatsResponse {
     pub total: i64,
+    pub unique_ips: i64,
     pub services: Vec<ServiceStat>,
     pub credentials: Vec<CredentialStat>,
     pub paths: Vec<PathStat>,
@@ -50,12 +51,14 @@ pub async fn api_stats(
     Query(query): Query<StatsQuery>,
 ) -> Json<StatsResponse> {
     let total = state.db.get_total_count().await.unwrap_or(0);
+    let unique_ips = state.db.get_unique_ips(query.hours).await.unwrap_or(0);
     let services = state.db.get_service_stats(query.hours).await.unwrap_or_default();
     let credentials = state.db.get_top_credentials(query.hours, 50).await.unwrap_or_default();
     let paths = state.db.get_top_paths(query.hours, 50).await.unwrap_or_default();
 
     Json(StatsResponse {
         total,
+        unique_ips,
         services,
         credentials,
         paths,

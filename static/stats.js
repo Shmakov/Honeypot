@@ -2,15 +2,9 @@
  * Honeypot Statistics Page
  */
 
-// Map globals
+// Map globals - uses shared TILE_URLS from map.js
 let statsMap = null;
 let countryMarkers = [];
-
-// Tile URLs for different themes
-const TILE_URLS = {
-    dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-};
 let currentTileLayer = null;
 
 class StatsPage {
@@ -281,22 +275,18 @@ class StatsPage {
         `).join('');
     }
 
+    // Utilities - use shared functions
     truncate(str, len) {
-        return str.length > len ? str.substring(0, len) + '...' : str;
+        return truncate(str, len);
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text || '';
-        return div.innerHTML;
+        return escapeHtml(text);
     }
 
-    // Convert country code to flag emoji (e.g., 'US' -> 🇺🇸)
-    countryToFlag(countryCode) {
-        if (!countryCode || countryCode.length !== 2) return '';
-        const code = countryCode.toUpperCase();
-        const offset = 127397;
-        return String.fromCodePoint(...[...code].map(c => c.charCodeAt(0) + offset));
+    // Convert country code to flag emoji - use shared utility
+    countryToFlag(code) {
+        return countryToFlag(code);
     }
 }
 

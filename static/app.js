@@ -171,13 +171,9 @@ class HoneypotDashboard {
         return map[service.toLowerCase()] || 'service-default';
     }
 
-    // Convert country code to flag emoji (e.g., 'US' -> 🇺🇸)
-    countryToFlag(countryCode) {
-        if (!countryCode || countryCode.length !== 2) return '';
-        const code = countryCode.toUpperCase();
-        // Each letter is offset from 'A' (65) to regional indicator 'A' (127462)
-        const offset = 127397; // 127462 - 65
-        return String.fromCodePoint(...[...code].map(c => c.charCodeAt(0) + offset));
+    // Convert country code to flag emoji - use shared utility
+    countryToFlag(code) {
+        return countryToFlag(code);
     }
 
     showEventDetails(event) {
@@ -233,25 +229,9 @@ class HoneypotDashboard {
         this.modalOverlay.classList.add('active');
     }
 
-    // Decode hex string to text
+    // Decode hex string to text - use shared utility
     hexDecode(hex) {
-        let str = '';
-        for (let i = 0; i < hex.length; i += 2) {
-            const byte = parseInt(hex.substr(i, 2), 16);
-            // Replace non-printable chars with dots
-            if (byte >= 32 && byte < 127) {
-                str += String.fromCharCode(byte);
-            } else if (byte === 10) {
-                str += '\n';
-            } else if (byte === 13) {
-                str += '\r';
-            } else if (byte === 9) {
-                str += '\t';
-            } else {
-                str += '.';
-            }
-        }
-        return str;
+        return hexDecode(hex);
     }
 
     hideModal() {
@@ -353,19 +333,17 @@ class HoneypotDashboard {
         });
     }
 
-    // Utilities
+    // Utilities - use shared functions
     formatNumber(num) {
-        return num.toLocaleString();
+        return formatNumber(num);
     }
 
     truncate(str, len) {
-        return str.length > len ? str.substring(0, len) + '...' : str;
+        return truncate(str, len);
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return escapeHtml(text);
     }
 }
 
@@ -374,17 +352,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.dashboard = new HoneypotDashboard();
 });
 
-// Attack Map using Leaflet.js
+// Attack Map using Leaflet.js - uses shared map.js utilities
 let attackMap = null;
 let attackMarkers = [];
 let currentTileLayer = null;
 const MAX_MARKERS = 50;
-
-// Tile URLs for different themes
-const TILE_URLS = {
-    dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-};
 
 function initAttackMap() {
     const mapElement = document.getElementById('attackMap');

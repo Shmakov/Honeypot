@@ -58,7 +58,44 @@ impl Config {
         let settings = builder.build()?;
         let config: Config = settings.try_deserialize()?;
         
+        // Validate configuration
+        config.validate()?;
+        
         Ok(config)
+    }
+
+    /// Validate configuration values
+    pub fn validate(&self) -> Result<()> {
+        // Validate server config
+        if self.server.http_port == 0 {
+            anyhow::bail!("Invalid http_port: 0 is not allowed");
+        }
+        if self.server.host.is_empty() {
+            anyhow::bail!("Server host cannot be empty");
+        }
+        
+        // Validate database config
+        if self.database.url.is_empty() {
+            anyhow::bail!("Database URL cannot be empty");
+        }
+        if self.database.driver != "sqlite" && self.database.driver != "postgres" {
+            anyhow::bail!("Invalid database driver '{}'. Must be 'sqlite' or 'postgres'", self.database.driver);
+        }
+        
+        // Validate TLS (both or neither must be set)
+        let has_cert = !self.server.tls_cert.is_empty();
+        let has_key = !self.server.tls_key.is_empty();
+        if has_cert != has_key {
+            anyhow::bail!("TLS configuration incomplete: both tls_cert and tls_key must be set, or neither");
+        }
+        
+        // Validate logging level
+        let valid_levels = ["trace", "debug", "info", "warn", "error"];
+        if !valid_levels.contains(&self.logging.level.to_lowercase().as_str()) {
+            anyhow::bail!("Invalid logging level '{}'. Must be one of: {:?}", self.logging.level, valid_levels);
+        }
+        
+        Ok(())
     }
 
     pub fn tls_enabled(&self) -> bool {
