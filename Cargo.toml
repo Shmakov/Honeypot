@@ -46,6 +46,9 @@ async-trait = "0.1"
 futures = "0.3"
 bytes = "1"
 
+# ICMP capture
+pnet = "0.35"
+
 [profile.release]
 lto = true
 codegen-units = 1
