@@ -43,12 +43,12 @@ jobs:
 
       - name: Create deployment package
         run: |
-          mkdir -p honeypot-linux
+          mkdir -p honeypot-linux/data
           cp target/release/honeypot honeypot-linux/
           cp -r static honeypot-linux/
-          cp -r migrations honeypot-linux/
           cp config.toml honeypot-linux/
-          mkdir -p honeypot-linux/data
+          # Copy migrations if they exist
+          [ -d "migrations" ] && cp -r migrations honeypot-linux/ || true
           # Create a placeholder for GeoIP database
           echo "Place GeoLite2-City.mmdb here" > honeypot-linux/data/README.txt
           tar -czvf honeypot-linux.tar.gz honeypot-linux
