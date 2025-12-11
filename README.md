@@ -118,19 +118,16 @@ sudo setcap 'cap_net_bind_service=+ep' ./target/release/honeypot
 
 ### Systemd Service
 
-```ini
-[Unit]
-Description=Honeypot
-After=network.target
+A production-ready systemd service file is available at [`deploy/honeypot.service`](deploy/honeypot.service).
 
-[Service]
-Type=simple
-ExecStart=/opt/honeypot/honeypot
-WorkingDirectory=/opt/honeypot
-Restart=always
+```bash
+# Copy the service file
+sudo cp deploy/honeypot.service /etc/systemd/system/
 
-[Install]
-WantedBy=multi-user.target
+# Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable honeypot
+sudo systemctl start honeypot
 ```
 
 ## Tech Stack
