@@ -78,7 +78,11 @@ async fn handle_ftp_session(
                 Ok(0) => break, // Connection closed
                 Ok(_) => {
                     let cmd = line.trim().to_string();
-                    commands.push(cmd.clone());
+                    
+                    // Security: Limit command buffer to prevent memory exhaustion
+                    if commands.len() < 100 {
+                        commands.push(cmd.clone());
+                    }
 
                     let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
                     let command = parts.get(0).map(|s| s.to_uppercase()).unwrap_or_default();

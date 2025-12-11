@@ -7,12 +7,14 @@ use anyhow::Result;
 use axum::{
     body::Bytes,
     extract::{ConnectInfo, Request, State},
-    http::{HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderValue, Method, StatusCode},
     response::IntoResponse,
     routing::{any, get},
     Router,
 };
 use std::{net::SocketAddr, sync::Arc};
+use tower_http::cors::CorsLayer;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::info;
 
 use crate::config::Config;
@@ -113,6 +115,7 @@ async fn stats_with_log(
 }
 
 /// Handler for static files - serves file AND logs the request
+/// Security: Validates path to prevent directory traversal attacks
 async fn static_with_log(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -123,9 +126,64 @@ async fn static_with_log(
     let full_path = format!("/static/{}", path);
     log_http_event(&state, ip, "GET", &full_path, &headers, None).await;
     
-    // Serve the static file
-    let file_path = format!("static/{}", path);
-    match tokio::fs::read(&file_path).await {
+    // Security: Validate path to prevent directory traversal
+    // Check for common traversal patterns before even trying to access filesystem
+    let path_lower = path.to_lowercase();
+    if path.contains("..") 
+        || path.contains("%2e") 
+        || path_lower.contains("%2f")
+        || path.starts_with('/') 
+        || path.starts_with('\\')
+        || path.contains('\0')
+    {
+        return axum::response::Response::builder()
+            .status(StatusCode::BAD_REQUEST)
+            .header("Content-Type", "text/plain")
+            .body(axum::body::Body::from("Invalid path"))
+            .unwrap();
+    }
+    
+    // Build the file path and canonicalize to resolve any remaining traversal attempts
+    let static_dir = std::path::Path::new("static");
+    let requested_path = static_dir.join(&path);
+    
+    // Canonicalize both paths to compare absolute locations
+    let canonical_static = match static_dir.canonicalize() {
+        Ok(p) => p,
+        Err(_) => {
+            return axum::response::Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(axum::body::Body::from("Server configuration error"))
+                .unwrap();
+        }
+    };
+    
+    let canonical_requested = match requested_path.canonicalize() {
+        Ok(p) => p,
+        Err(_) => {
+            // File doesn't exist or can't be accessed
+            return axum::response::Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .body(axum::body::Body::from("Not Found"))
+                .unwrap();
+        }
+    };
+    
+    // Security: Verify the canonical path is within the static directory
+    if !canonical_requested.starts_with(&canonical_static) {
+        tracing::warn!(
+            "Path traversal attempt blocked: {} resolved to {:?}", 
+            path, 
+            canonical_requested
+        );
+        return axum::response::Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body(axum::body::Body::from("Forbidden"))
+            .unwrap();
+    }
+    
+    // Safe to read the file now
+    match tokio::fs::read(&canonical_requested).await {
         Ok(contents) => {
             // Determine content type from extension
             let content_type = if path.ends_with(".js") {
@@ -140,6 +198,8 @@ async fn static_with_log(
                 "image/png"
             } else if path.ends_with(".ico") {
                 "image/x-icon"
+            } else if path.ends_with(".txt") {
+                "text/plain"
             } else {
                 "application/octet-stream"
             };
@@ -273,7 +333,28 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         .route("/static/*path", get(static_with_log))
         // Catch-all for any other path - log as attack
         .fallback(any(catch_all))
-        .with_state(state);
+        .with_state(state)
+        // Security: Add security headers
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        // Security: Same-origin only CORS - denies cross-origin API requests
+        .layer(
+            CorsLayer::new()
+                .allow_methods([Method::GET])
+                .allow_origin(tower_http::cors::AllowOrigin::exact(
+                    HeaderValue::from_static("null"), // Only same-origin requests allowed
+                ))
+        );
 
     // Check if TLS is enabled
     if config.tls_enabled() {
