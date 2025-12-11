@@ -15,7 +15,8 @@ env:
 jobs:
   build:
     name: Build Linux Binary
-    runs-on: ubuntu-latest
+    # Use Ubuntu 22.04 for GLIBC 2.35 compatibility with Debian 12 (GLIBC 2.36)
+    runs-on: ubuntu-22.04
     
     steps:
       - name: Checkout code
