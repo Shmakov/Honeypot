@@ -1,0 +1,86 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main, new]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build Linux Binary
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Strip binary (reduce size)
+        run: strip target/release/honeypot
+
+      - name: Create deployment package
+        run: |
+          mkdir -p honeypot-linux
+          cp target/release/honeypot honeypot-linux/
+          cp -r static honeypot-linux/
+          cp -r migrations honeypot-linux/
+          cp config.toml honeypot-linux/
+          mkdir -p honeypot-linux/data
+          # Create a placeholder for GeoIP database
+          echo "Place GeoLite2-City.mmdb here" > honeypot-linux/data/README.txt
+          tar -czvf honeypot-linux.tar.gz honeypot-linux
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: honeypot-linux
+          path: honeypot-linux.tar.gz
+          retention-days: 30
+
+  # Create GitHub Release when a tag is pushed
+  release:
+    name: Create Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: honeypot-linux
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: honeypot-linux.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
