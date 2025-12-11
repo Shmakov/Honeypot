@@ -355,8 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
 // Attack Map using Leaflet.js - uses shared map.js utilities
 let attackMap = null;
 let attackMarkers = [];
+let markersByLocation = new Map(); // Track markers by location key for aggregation
 let currentTileLayer = null;
-const MAX_MARKERS = 50;
+const MAX_MARKERS = 500;
+const MARKER_TIMEOUT = 90000; // 90 seconds
 
 function initAttackMap() {
     const mapElement = document.getElementById('attackMap');
@@ -409,11 +411,69 @@ window.updateMapTheme = function (theme) {
     }).addTo(attackMap);
 };
 
+// Create location key for aggregation (round to 2 decimal places ~1km precision)
+function getLocationKey(lat, lon) {
+    return `${lat.toFixed(2)},${lon.toFixed(2)}`;
+}
+
+// Update marker icon with count badge
+function updateMarkerIcon(markerData) {
+    const { marker, count, service } = markerData;
+    const showBadge = count > 1;
+
+    const attackIcon = L.divIcon({
+        className: 'attack-marker',
+        html: `
+            <div class="attack-pulse"></div>
+            <div class="attack-dot" data-service="${service}"></div>
+            ${showBadge ? `<div class="attack-count-badge">${count > 99 ? '99+' : count}</div>` : ''}
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+    });
+
+    marker.setIcon(attackIcon);
+}
+
 // Add an attack dot to the map
 function addAttackDot(lat, lon, ip, service) {
     if (!attackMap) return;
 
-    // Create pulsing marker
+    const locationKey = getLocationKey(lat, lon);
+
+    // Check if we already have a marker at this location
+    if (markersByLocation.has(locationKey)) {
+        const markerData = markersByLocation.get(locationKey);
+        markerData.count++;
+        markerData.ips.add(ip);
+        markerData.services.add(service);
+
+        // Update the icon to show new count
+        updateMarkerIcon(markerData);
+
+        // Update popup content
+        const uniqueIps = Array.from(markerData.ips).slice(-5); // Show last 5 IPs
+        const ipList = uniqueIps.map(ip => `<div style="font-family: monospace; font-size: 12px;">${ip}</div>`).join('');
+        const moreText = markerData.ips.size > 5 ? `<div style="color: #888; font-size: 11px;">+${markerData.ips.size - 5} more</div>` : '';
+
+        markerData.marker.setPopupContent(`
+            <div style="font-family: inherit; min-width: 120px;">
+                <div style="font-weight: 600; margin-bottom: 4px; color: #ef4444;">${markerData.count} requests</div>
+                ${ipList}
+                ${moreText}
+            </div>
+        `);
+
+        // Reset the timeout
+        if (markerData.timeoutId) {
+            clearTimeout(markerData.timeoutId);
+        }
+        markerData.timeoutId = setTimeout(() => removeMarkerByKey(locationKey), MARKER_TIMEOUT);
+
+        return;
+    }
+
+    // Create new marker
     const attackIcon = L.divIcon({
         className: 'attack-marker',
         html: `<div class="attack-pulse"></div><div class="attack-dot" data-service="${service}"></div>`,
@@ -425,22 +485,43 @@ function addAttackDot(lat, lon, ip, service) {
         .bindPopup(`<div style="font-family: inherit"><strong>${ip}</strong><br><span style="color: #888">${service}</span></div>`)
         .addTo(attackMap);
 
-    attackMarkers.push(marker);
+    const markerData = {
+        marker,
+        count: 1,
+        ips: new Set([ip]),
+        services: new Set([service]),
+        locationKey,
+        timeoutId: setTimeout(() => removeMarkerByKey(locationKey), MARKER_TIMEOUT)
+    };
+
+    attackMarkers.push(markerData);
+    markersByLocation.set(locationKey, markerData);
 
     // Remove old markers if too many
-    if (attackMarkers.length > MAX_MARKERS) {
-        const oldMarker = attackMarkers.shift();
-        attackMap.removeLayer(oldMarker);
+    while (attackMarkers.length > MAX_MARKERS) {
+        const oldMarkerData = attackMarkers.shift();
+        removeMarkerByKey(oldMarkerData.locationKey, false);
+    }
+}
+
+// Remove marker by location key
+function removeMarkerByKey(locationKey, removeFromArray = true) {
+    const markerData = markersByLocation.get(locationKey);
+    if (!markerData) return;
+
+    if (markerData.timeoutId) {
+        clearTimeout(markerData.timeoutId);
     }
 
-    // Auto-remove after 30 seconds
-    setTimeout(() => {
-        const idx = attackMarkers.indexOf(marker);
+    attackMap.removeLayer(markerData.marker);
+    markersByLocation.delete(locationKey);
+
+    if (removeFromArray) {
+        const idx = attackMarkers.findIndex(m => m.locationKey === locationKey);
         if (idx > -1) {
             attackMarkers.splice(idx, 1);
-            attackMap.removeLayer(marker);
         }
-    }, 30000);
+    }
 }
 
 // Expose for dashboard to call

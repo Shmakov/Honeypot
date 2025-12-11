@@ -129,6 +129,49 @@
     }
 }
 
+/* Attack count badge */
+.attack-count-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: 2px solid #1a1a2e;
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+    animation: badgePop 0.2s ease-out;
+}
+
+@keyframes badgePop {
+    0% {
+        transform: scale(0);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Light theme badge adjustment */
+[data-theme="light"] .attack-count-badge {
+    border-color: #ffffff;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+}
+
 /* Service badges */
 .service-ssh {
     background-color: rgba(239, 68, 68, 0.2);
