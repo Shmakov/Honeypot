@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::net::TcpListener;
 use tracing::{debug, info, warn};
 
@@ -56,12 +56,14 @@ async fn handle_telnet_session(
     db: Arc<Database>,
     geoip: SharedGeoIp,
 ) {
-    let (reader, mut writer) = socket.into_split();
+    let (reader, writer) = socket.into_split();
     let mut reader = BufReader::new(reader);
+    let mut writer = BufWriter::new(writer);
 
     // Send login banner
     let _ = writer.write_all(b"\r\nUbuntu 20.04 LTS\r\n").await;
     let _ = writer.write_all(b"login: ").await;
+    let _ = writer.flush().await;
 
     let mut username = String::new();
     let mut password = String::new();
@@ -82,12 +84,14 @@ async fn handle_telnet_session(
                         0 => {
                             username = input;
                             let _ = writer.write_all(b"Password: ").await;
+                            let _ = writer.flush().await;
                             state = 1;
                         }
                         1 => {
                             password = input;
                             let _ = writer.write_all(b"\r\nWelcome to Ubuntu 20.04 LTS\r\n").await;
                             let _ = writer.write_all(format!("{}@ubuntu:~$ ", username).as_bytes()).await;
+                            let _ = writer.flush().await;
                             state = 2;
                         }
                         2 => {
@@ -110,6 +114,7 @@ async fn handle_telnet_session(
                             
                             let _ = writer.write_all(response.as_bytes()).await;
                             let _ = writer.write_all(format!("{}@ubuntu:~$ ", username).as_bytes()).await;
+                            let _ = writer.flush().await;
                             
                             // Limit interaction
                             if commands.len() >= 20 {
