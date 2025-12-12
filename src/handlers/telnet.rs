@@ -56,14 +56,26 @@ async fn handle_telnet_session(
     db: Arc<Database>,
     geoip: SharedGeoIp,
 ) {
+    debug!("Telnet session started from {}", ip);
+    
     let (reader, writer) = socket.into_split();
     let mut reader = BufReader::new(reader);
     let mut writer = BufWriter::new(writer);
 
     // Send login banner
-    let _ = writer.write_all(b"\r\nUbuntu 20.04 LTS\r\n").await;
-    let _ = writer.write_all(b"login: ").await;
-    let _ = writer.flush().await;
+    if let Err(e) = writer.write_all(b"\r\nUbuntu 20.04 LTS\r\n").await {
+        debug!("Telnet write banner failed for {}: {}", ip, e);
+        return;
+    }
+    if let Err(e) = writer.write_all(b"login: ").await {
+        debug!("Telnet write login prompt failed for {}: {}", ip, e);
+        return;
+    }
+    if let Err(e) = writer.flush().await {
+        debug!("Telnet flush failed for {}: {}", ip, e);
+        return;
+    }
+    debug!("Telnet sent login prompt to {}", ip);
 
     let mut username = String::new();
     let mut password = String::new();
@@ -76,22 +88,43 @@ async fn handle_telnet_session(
         loop {
             line.clear();
             match reader.read_line(&mut line).await {
-                Ok(0) => break,
-                Ok(_) => {
+                Ok(0) => {
+                    debug!("Telnet EOF from {} in state {}", ip, state);
+                    break;
+                }
+                Ok(n) => {
+                    debug!("Telnet received {} bytes from {} in state {}: {:?}", n, ip, state, line.trim());
                     let input = line.trim().to_string();
                     
                     match state {
                         0 => {
                             username = input;
-                            let _ = writer.write_all(b"Password: ").await;
-                            let _ = writer.flush().await;
+                            debug!("Telnet got username '{}' from {}", username, ip);
+                            if let Err(e) = writer.write_all(b"Password: ").await {
+                                debug!("Telnet write password prompt failed for {}: {}", ip, e);
+                                break;
+                            }
+                            if let Err(e) = writer.flush().await {
+                                debug!("Telnet flush password prompt failed for {}: {}", ip, e);
+                                break;
+                            }
                             state = 1;
                         }
                         1 => {
                             password = input;
-                            let _ = writer.write_all(b"\r\nWelcome to Ubuntu 20.04 LTS\r\n").await;
-                            let _ = writer.write_all(format!("{}@ubuntu:~$ ", username).as_bytes()).await;
-                            let _ = writer.flush().await;
+                            debug!("Telnet got password from {}", ip);
+                            if let Err(e) = writer.write_all(b"\r\nWelcome to Ubuntu 20.04 LTS\r\n").await {
+                                debug!("Telnet write welcome failed for {}: {}", ip, e);
+                                break;
+                            }
+                            if let Err(e) = writer.write_all(format!("{}@ubuntu:~$ ", username).as_bytes()).await {
+                                debug!("Telnet write prompt failed for {}: {}", ip, e);
+                                break;
+                            }
+                            if let Err(e) = writer.flush().await {
+                                debug!("Telnet flush shell prompt failed for {}: {}", ip, e);
+                                break;
+                            }
                             state = 2;
                         }
                         2 => {
@@ -100,6 +133,7 @@ async fn handle_telnet_session(
                             // Simulate some basic commands
                             let response = match input.split_whitespace().next() {
                                 Some("exit") | Some("quit") | Some("logout") => {
+                                    debug!("Telnet exit command from {}", ip);
                                     return;
                                 }
                                 Some("pwd") => "/home/user\r\n",
@@ -118,13 +152,17 @@ async fn handle_telnet_session(
                             
                             // Limit interaction
                             if commands.len() >= 20 {
+                                debug!("Telnet command limit reached for {}", ip);
                                 break;
                             }
                         }
                         _ => break,
                     }
                 }
-                Err(_) => break,
+                Err(e) => {
+                    debug!("Telnet read error from {} in state {}: {}", ip, state, e);
+                    break;
+                }
             }
         }
     });
