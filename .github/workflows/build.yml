@@ -103,14 +103,11 @@ jobs:
           # Stop, swap binary, start - all in one SSH session
           ssh -T -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'ENDSSH'
-          echo "Connected as: $(whoami)"
-          echo "Testing sudo access..."
-          sudo -n true && echo "Sudo works!" || echo "Sudo failed!"
           sudo systemctl stop honeypot || true
           mv /opt/honeypot/honeypot.new /opt/honeypot/honeypot
           sudo systemctl start honeypot
           sleep 2
-          sudo systemctl status honeypot --no-pager || true
+          sudo systemctl status honeypot --no-pager
           ENDSSH
 
       - name: Cleanup
