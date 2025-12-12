@@ -83,23 +83,27 @@ jobs:
 
       - name: Deploy to server
         run: |
-          # Stop service before updating binary
+          # Stop service before updating binary (ignore errors if service not running or sudo fails)
           ssh -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
-            "sudo systemctl stop honeypot || true"
+            "sudo systemctl stop honeypot" || echo "Warning: Could not stop service"
           
-          # Copy new files
+          # Copy new binary
           scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             honeypot-linux/honeypot \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/honeypot
           
+          # Copy static files
           scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
             honeypot-linux/static \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/
           
-          scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-            honeypot-linux/migrations \
-            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/ || true
+          # Copy migrations if they exist
+          if [ -d "honeypot-linux/migrations" ]; then
+            scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+              honeypot-linux/migrations \
+              ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/
+          fi
           
           # Start service
           ssh -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
