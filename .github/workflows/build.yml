@@ -58,6 +58,58 @@ jobs:
           path: honeypot-linux.tar.gz
           retention-days: 30
 
+  # Deploy to GCP when pushing to main/new or manual trigger
+  deploy:
+    name: Deploy to GCP
+    needs: build
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/new') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: honeypot-linux
+
+      - name: Extract artifact
+        run: tar -xzvf honeypot-linux.tar.gz
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.GCP_SSH_PORT }} ${{ secrets.GCP_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to server
+        run: |
+          # Stop service before updating binary
+          ssh -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
+            "sudo systemctl stop honeypot || true"
+          
+          # Copy new files
+          scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            honeypot-linux/honeypot \
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/honeypot
+          
+          scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+            honeypot-linux/static \
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/
+          
+          scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
+            honeypot-linux/migrations \
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/ || true
+          
+          # Start service
+          ssh -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
+            "sudo systemctl start honeypot && sudo systemctl status honeypot --no-pager"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
   # Create GitHub Release when a tag is pushed
   release:
     name: Create Release
