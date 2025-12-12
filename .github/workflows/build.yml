@@ -83,15 +83,10 @@ jobs:
 
       - name: Deploy to server
         run: |
-          # Stop service before updating binary (ignore errors if service not running or sudo fails)
-          ssh -tt -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
-            "sudo systemctl stop honeypot" || echo "Warning: Could not stop service"
-          
-          # Copy new binary
+          # Copy new binary first
           scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             honeypot-linux/honeypot \
-            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/honeypot
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/honeypot.new
           
           # Copy static files
           scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
@@ -105,10 +100,15 @@ jobs:
               ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/
           fi
           
-          # Start service
-          ssh -tt -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
-            "sudo systemctl start honeypot && sudo systemctl status honeypot --no-pager"
+          # Stop, swap binary, start - all in one SSH session
+          ssh -T -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} << 'ENDSSH'
+          sudo systemctl stop honeypot || true
+          mv /opt/honeypot/honeypot.new /opt/honeypot/honeypot
+          sudo systemctl start honeypot
+          sleep 2
+          sudo systemctl status honeypot --no-pager || true
+          ENDSSH
 
       - name: Cleanup
         if: always()
