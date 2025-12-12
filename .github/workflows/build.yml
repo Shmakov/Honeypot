@@ -84,7 +84,7 @@ jobs:
       - name: Deploy to server
         run: |
           # Stop service before updating binary (ignore errors if service not running or sudo fails)
-          ssh -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          ssh -tt -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
             "sudo systemctl stop honeypot" || echo "Warning: Could not stop service"
           
@@ -106,7 +106,7 @@ jobs:
           fi
           
           # Start service
-          ssh -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          ssh -tt -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }} \
             "sudo systemctl start honeypot && sudo systemctl status honeypot --no-pager"
 
