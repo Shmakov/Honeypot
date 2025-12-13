@@ -228,6 +228,46 @@ class StatsPage {
         });
     }
 
+    /**
+     * Formats a credential (username/password) for display.
+     * Shows "(empty)" for empty strings and makes whitespace visible.
+     */
+    formatCredential(value, colorClass) {
+        if (!value || value.length === 0) {
+            return `<span class="text-gray-500 italic">(empty)</span>`;
+        }
+
+        // Check if it's whitespace-only
+        if (value.trim().length === 0) {
+            // Show spaces as visible dots
+            const visibleSpaces = value.replace(/ /g, '·').replace(/\t/g, '→');
+            return `<span class="${colorClass}" title="${value.length} whitespace character(s)">${this.escapeHtml(visibleSpaces)}</span>`;
+        }
+
+        // Check if it starts or ends with whitespace
+        const hasLeadingSpace = value !== value.trimStart();
+        const hasTrailingSpace = value !== value.trimEnd();
+
+        if (hasLeadingSpace || hasTrailingSpace) {
+            // Highlight the string with a subtle indicator
+            let displayed = this.escapeHtml(value);
+            if (hasLeadingSpace) {
+                const leadingSpaces = value.length - value.trimStart().length;
+                displayed = `<span class="text-gray-500">${'·'.repeat(leadingSpaces)}</span>${this.escapeHtml(value.trimStart())}`;
+            }
+            if (hasTrailingSpace) {
+                const trailingSpaces = value.length - value.trimEnd().length;
+                const base = hasLeadingSpace
+                    ? `<span class="text-gray-500">${'·'.repeat(value.length - value.trimStart().length)}</span>${this.escapeHtml(value.trim())}`
+                    : this.escapeHtml(value.trimEnd());
+                displayed = `${base}<span class="text-gray-500">${'·'.repeat(trailingSpaces)}</span>`;
+            }
+            return `<span class="${colorClass}">${displayed}</span>`;
+        }
+
+        return `<span class="${colorClass}">${this.escapeHtml(value)}</span>`;
+    }
+
     updateCredentialsTable(credentials) {
         const tbody = document.getElementById('credentialsTable');
 
@@ -245,8 +285,8 @@ class StatsPage {
 
         tbody.innerHTML = credentials.slice(0, 10).map(c => `
             <tr class="hover:bg-gray-800/30 transition-colors">
-                <td class="px-6 py-3 font-mono text-sm text-amber-400">${this.escapeHtml(c.username)}</td>
-                <td class="px-6 py-3 font-mono text-sm text-red-400">${this.escapeHtml(c.password)}</td>
+                <td class="px-6 py-3 font-mono text-sm">${this.formatCredential(c.username, 'text-amber-400')}</td>
+                <td class="px-6 py-3 font-mono text-sm">${this.formatCredential(c.password, 'text-red-400')}</td>
                 <td class="px-6 py-3 text-sm text-gray-400 text-right tabular-nums">${c.count.toLocaleString()}</td>
             </tr>
         `).join('');
