@@ -13,3 +13,6 @@
 
 # Environment
 .env
+
+# SSH host key (auto-generated)
+data/ssh_host_key

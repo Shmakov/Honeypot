@@ -49,6 +49,10 @@ bytes = "1"
 # ICMP capture
 pnet = "0.35"
 
+# SSH protocol
+russh = "0.46"
+russh-keys = "0.46"
+
 [profile.release]
 lto = true
 codegen-units = 1
