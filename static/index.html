@@ -45,29 +45,27 @@
     <div id="app" class="min-h-screen">
 
         <!-- Header -->
-        <header class="sticky top-0 z-50 backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
+        <header class="sticky top-0 z-[9999] backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
-                    <!-- Logo -->
-                    <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                <div class="flex flex-wrap items-center justify-between gap-y-3 py-3 sm:py-0 sm:h-16">
+                    <!-- Row 1 on mobile: Logo + Theme Toggle -->
+                    <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity order-1">
                         <span class="text-2xl">🍯</span>
                         <span
                             class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Honeypot</span>
                     </a>
 
-                    <!-- Navigation -->
-                    <nav class="flex items-center gap-2">
-                        <a href="/"
-                            class="px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Dashboard</a>
-                        <a href="/stats"
-                            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Statistics</a>
-                    </nav>
+                    <button id="themeToggle"
+                        class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl order-2 sm:order-3"
+                        title="Toggle theme">🌙</button>
 
-                    <!-- Header Actions -->
-                    <div class="flex items-center gap-3">
-                        <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl"
-                            title="Toggle theme">🌙</button>
-                    </div>
+                    <!-- Row 2 on mobile: Navigation -->
+                    <nav class="flex items-center gap-2 order-3 sm:order-2 w-full sm:w-auto">
+                        <a href="/"
+                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Dashboard</a>
+                        <a href="/stats"
+                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Statistics</a>
+                    </nav>
                 </div>
             </div>
         </header>
