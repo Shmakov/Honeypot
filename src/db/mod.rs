@@ -156,6 +156,15 @@ impl Database {
         Ok(row.0)
     }
 
+    pub async fn get_filtered_count(&self, since_hours: i64) -> Result<i64> {
+        let since = Utc::now().timestamp_millis() - (since_hours * 3600 * 1000);
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM requests WHERE timestamp > ?")
+            .bind(since)
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(row.0)
+    }
+
     pub async fn get_recent_credentials(&self, limit: i32) -> Result<Vec<(String, String)>> {
         let rows: Vec<(String, String)> = sqlx::query_as(
             "SELECT username, password FROM requests WHERE username IS NOT NULL ORDER BY id DESC LIMIT ?"

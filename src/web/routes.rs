@@ -50,7 +50,7 @@ pub async fn api_stats(
     State(state): State<Arc<AppState>>,
     Query(query): Query<StatsQuery>,
 ) -> Json<StatsResponse> {
-    let total = state.db.get_total_count().await.unwrap_or(0);
+    let total = state.db.get_filtered_count(query.hours).await.unwrap_or(0);
     let unique_ips = state.db.get_unique_ips(query.hours).await.unwrap_or(0);
     let services = state.db.get_service_stats(query.hours).await.unwrap_or_default();
     let credentials = state.db.get_top_credentials(query.hours, 50).await.unwrap_or_default();
