@@ -1,5 +1,6 @@
 //! Web server module
 
+mod middleware;
 mod routes;
 mod sse;
 
@@ -7,7 +8,6 @@ pub use routes::warm_cache;
 
 use anyhow::Result;
 use axum::{
-    body::Bytes,
     extract::{ConnectInfo, Request, State},
     http::{header, HeaderMap, HeaderValue, Method, StatusCode},
     response::IntoResponse,
@@ -20,7 +20,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::info;
 
 use crate::config::Config;
-use crate::db::{AttackEvent, Database};
+use crate::db::Database;
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
 
@@ -42,92 +42,11 @@ fn format_headers(headers: &HeaderMap) -> String {
         .join("\n")
 }
 
-/// Log an HTTP request as an attack event
-async fn log_http_event(
-    state: &AppState,
-    ip: String,
-    method: &str,
-    uri: &str,
-    headers: &HeaderMap,
-    body: Option<Bytes>,
-) {
-    // Format request with method, path, and headers
-    let headers_str = format_headers(headers);
-    let request_str = format!("{} {}\n{}", method, uri, headers_str);
-    
-    // Extract User-Agent header
-    let user_agent = headers
-        .get("user-agent")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
-    
-    let mut event = AttackEvent::new(
-        ip.clone(),
-        "http".to_string(),
-        80,
-        request_str,
-    );
-    event.http_path = Some(uri.to_string());
-    
-    // Add User-Agent if present
-    if let Some(ua) = user_agent {
-        event = event.with_user_agent(ua);
-    }
-    
-    // Store body as payload if present
-    if let Some(body_bytes) = body {
-        if !body_bytes.is_empty() {
-            event = event.with_payload(body_bytes.to_vec());
-        }
-    }
-    
-    // Add GeoIP info
-    if let Some(loc) = state.geoip.lookup(&ip) {
-        event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
-    }
-    
-    if let Err(e) = state.db.insert_event(&event).await {
-        tracing::warn!("Failed to store HTTP event: {}", e);
-    }
-    state.event_bus.publish(event);
-    
-    tracing::info!("HTTP {} {} from {}", method, uri, ip);
-}
-
-/// Handler for homepage - serves page AND logs the request
-async fn index_with_log(
-    State(state): State<Arc<AppState>>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
-    let ip = addr.ip().to_string();
-    log_http_event(&state, ip, "GET", "/", &headers, None).await;
-    routes::index().await
-}
-
-/// Handler for stats page - serves page AND logs the request
-async fn stats_with_log(
-    State(state): State<Arc<AppState>>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
-    let ip = addr.ip().to_string();
-    log_http_event(&state, ip, "GET", "/stats", &headers, None).await;
-    routes::stats_page().await
-}
-
-/// Handler for static files - serves file AND logs the request
+/// Handler for static files
 /// Security: Validates path to prevent directory traversal attacks
-async fn static_with_log(
-    State(state): State<Arc<AppState>>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    headers: HeaderMap,
+async fn static_files(
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> impl IntoResponse {
-    let ip = addr.ip().to_string();
-    let full_path = format!("/static/{}", path);
-    log_http_event(&state, ip, "GET", &full_path, &headers, None).await;
-    
     // Security: Validate path to prevent directory traversal
     // Check for common traversal patterns before even trying to access filesystem
     let path_lower = path.to_lowercase();
@@ -221,7 +140,8 @@ async fn static_with_log(
     }
 }
 
-/// Handler for all unknown paths - log as attack, echo request, redirect to home
+/// Handler for all unknown paths - echo request, redirect to home
+/// Note: Logging is handled by the middleware layer
 async fn catch_all(
     State(state): State<Arc<AppState>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -232,7 +152,7 @@ async fn catch_all(
     let ip = addr.ip().to_string();
     let headers = request.headers().clone();
     
-    // Extract body for POST/PUT/PATCH requests
+    // Extract body for POST/PUT/PATCH requests (for display purposes)
     let body = if method == "POST" || method == "PUT" || method == "PATCH" {
         // Collect the body
         match axum::body::to_bytes(request.into_body(), 64 * 1024).await {
@@ -248,8 +168,6 @@ async fn catch_all(
     let body_display = body.as_ref()
         .map(|b| String::from_utf8_lossy(b).to_string())
         .unwrap_or_default();
-    
-    log_http_event(&state, ip.clone(), &method, &uri, &headers, body).await;
     
     // Determine redirect URL
     let redirect_url = if state.public_url.is_empty() {
@@ -319,23 +237,25 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
     });
 
     let app = Router::new()
-        // Pages (with logging)
-        .route("/", get(index_with_log))
-        .route("/stats", get(stats_with_log))
-        // robots.txt (no logging)
+        // Pages
+        .route("/", get(routes::index))
+        .route("/stats", get(routes::stats_page))
+        // robots.txt
         .route("/robots.txt", get(routes::robots_txt))
-        // SSE endpoint (no logging - internal)
+        // SSE endpoint
         .route("/events", get(sse::events_handler))
-        // API endpoints (no logging - internal)
+        // API endpoints
         .route("/api/stats", get(routes::api_stats))
         .route("/api/recent", get(routes::api_recent))
         .route("/api/countries", get(routes::api_countries))
         .route("/api/locations", get(routes::api_locations))
-        // Static files (with logging)
-        .route("/static/*path", get(static_with_log))
-        // Catch-all for any other path - log as attack
+        // Static files
+        .route("/static/*path", get(static_files))
+        // Catch-all for any other path
         .fallback(any(catch_all))
-        .with_state(state)
+        .with_state(state.clone())
+        // Request logging middleware - logs all HTTP requests
+        .layer(middleware::RequestLoggingLayer::new(state))
         // Security: Add security headers
         .layer(SetResponseHeaderLayer::if_not_present(
             header::X_FRAME_OPTIONS,
