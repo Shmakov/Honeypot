@@ -94,6 +94,14 @@ impl Database {
         sqlx::query("PRAGMA synchronous=NORMAL")
             .execute(&self.pool)
             .await?;
+        // Performance: 16MB cache (safe for 1GB server, default is 2MB)
+        sqlx::query("PRAGMA cache_size = -16000")
+            .execute(&self.pool)
+            .await?;
+        // Performance: Keep temp tables in memory
+        sqlx::query("PRAGMA temp_store = MEMORY")
+            .execute(&self.pool)
+            .await?;
         
         sqlx::query(schema::CREATE_TABLE)
             .execute(&self.pool)
@@ -149,11 +157,14 @@ impl Database {
         Ok(result.last_insert_rowid())
     }
 
+    /// Get total request count using MAX(rowid) for O(1) performance.
+    /// This works because we never delete rows - rowid equals count.
+    /// Note: Only use for home page total, not for filtered stats.
     pub async fn get_total_count(&self) -> Result<i64> {
-        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM requests")
+        let row: (Option<i64>,) = sqlx::query_as("SELECT MAX(rowid) FROM requests")
             .fetch_one(&self.pool)
             .await?;
-        Ok(row.0)
+        Ok(row.0.unwrap_or(0))
     }
 
     pub async fn get_filtered_count(&self, since_hours: i64) -> Result<i64> {
