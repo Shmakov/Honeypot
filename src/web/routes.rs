@@ -75,7 +75,7 @@ async fn get_cached_countries(hours: i64, db: Database) -> Vec<CountryStat> {
 /// Cached locations query - 5 minute TTL
 #[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
 async fn get_cached_locations(hours: i64, db: Database) -> Vec<LocationStat> {
-    db.get_location_stats(hours, 500).await.unwrap_or_default()
+    db.get_location_stats(hours, 2000).await.unwrap_or_default()
 }
 
 /// Cached recent credentials - 60 second TTL
