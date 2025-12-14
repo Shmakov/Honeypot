@@ -1,8 +1,4 @@
-/node_modules/
-/.idea/
-/config.js
-
-# Added by cargo
+# Build artifacts
 /target
 
 # Data files (download separately)

@@ -32,7 +32,7 @@ pub struct AppState {
 }
 
 /// Format HTTP headers as a readable string
-fn format_headers(headers: &HeaderMap) -> String {
+fn format_headers(headers: &axum::http::HeaderMap) -> String {
     headers
         .iter()
         .map(|(name, value)| {
@@ -203,8 +203,6 @@ async fn catch_all(
     
     (StatusCode::OK, axum::response::Html(html))
 }
-
-// Custom html_escape removed in favor of crate
 
 pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp) -> Result<()> {
     let state = Arc::new(AppState {
