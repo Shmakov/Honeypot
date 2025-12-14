@@ -17,9 +17,7 @@ use crate::db::AttackEvent;
 use super::AppState;
 
 /// Paths to exclude from logging (internal endpoints)
-const EXCLUDED_PATHS: &[&str] = &[
-    "/robots.txt",
-];
+const EXCLUDED_PATHS: &[&str] = &[];
 
 /// Get the real client IP address, checking proxy headers first
 /// Priority: X-Real-IP > X-Forwarded-For (first IP) > ConnectInfo
