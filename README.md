@@ -130,6 +130,11 @@ sudo systemctl enable honeypot
 sudo systemctl start honeypot
 ```
 
+### TLS with Caddy (Recommended)
+
+For production HTTPS with automatic certificate management, use Caddy as a reverse proxy. See [`deploy/CADDY.md`](deploy/CADDY.md) for setup instructions.
+
+
 ## Tech Stack
 
 - **Backend**: Rust, Axum, SQLite, tokio
