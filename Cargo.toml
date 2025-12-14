@@ -55,6 +55,7 @@ pnet = "0.35"
 # SSH protocol
 russh = "0.46"
 russh-keys = "0.46"
+html-escape = "0.2.13"
 
 [profile.release]
 lto = true

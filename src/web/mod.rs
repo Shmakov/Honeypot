@@ -47,28 +47,12 @@ fn format_headers(headers: &HeaderMap) -> String {
 async fn static_files(
     axum::extract::Path(path): axum::extract::Path<String>,
 ) -> impl IntoResponse {
-    // Security: Validate path to prevent directory traversal
-    // Check for common traversal patterns before even trying to access filesystem
-    let path_lower = path.to_lowercase();
-    if path.contains("..") 
-        || path.contains("%2e") 
-        || path_lower.contains("%2f")
-        || path.starts_with('/') 
-        || path.starts_with('\\')
-        || path.contains('\0')
-    {
-        return axum::response::Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .header("Content-Type", "text/plain")
-            .body(axum::body::Body::from("Invalid path"))
-            .unwrap();
-    }
-    
-    // Build the file path and canonicalize to resolve any remaining traversal attempts
+    // Build the file path
     let static_dir = std::path::Path::new("static");
     let requested_path = static_dir.join(&path);
     
-    // Canonicalize both paths to compare absolute locations
+    // Security: Canonicalize paths to resolve .. and symlinks checking
+    // This effectively prevents directory traversal attacks
     let canonical_static = match static_dir.canonicalize() {
         Ok(p) => p,
         Err(_) => {
@@ -90,7 +74,7 @@ async fn static_files(
         }
     };
     
-    // Security: Verify the canonical path is within the static directory
+    // Security: Verify the canonical path starts with the canonical static directory
     if !canonical_requested.starts_with(&canonical_static) {
         tracing::warn!(
             "Path traversal attempt blocked: {} resolved to {:?}", 
@@ -208,10 +192,10 @@ async fn catch_all(
         redirect_url = redirect_url,
         ip = ip,
         method = method,
-        uri = html_escape(&uri),
-        headers_display = html_escape(&headers_display),
+        uri = html_escape::encode_text(&uri),
+        headers_display = html_escape::encode_text(&headers_display),
         body_section = if !body_display.is_empty() {
-            format!(r#"<p class="label">Body:</p><pre>{}</pre>"#, html_escape(&body_display))
+             format!(r#"<p class="label">Body:</p><pre>{}</pre>"#, html_escape::encode_text(&body_display))
         } else {
             String::new()
         }
@@ -220,13 +204,7 @@ async fn catch_all(
     (StatusCode::OK, axum::response::Html(html))
 }
 
-/// Escape HTML special characters
-fn html_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
+// Custom html_escape removed in favor of crate
 
 pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp) -> Result<()> {
     let state = Arc::new(AppState {
