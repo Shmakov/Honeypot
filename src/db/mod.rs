@@ -299,33 +299,33 @@ impl Database {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ServiceStat {
     pub service: String,
     pub count: i64,
     pub percentage: f64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CredentialStat {
     pub username: String,
     pub password: String,
     pub count: i64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PathStat {
     pub path: String,
     pub count: i64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CountryStat {
     pub country_code: String,
     pub count: i64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LocationStat {
     pub lat: f64,
     pub lon: f64,

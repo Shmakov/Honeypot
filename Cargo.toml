@@ -46,6 +46,9 @@ async-trait = "0.1"
 futures = "0.3"
 bytes = "1"
 
+# Caching
+cached = { version = "0.54", features = ["async_tokio_rt_multi_thread"] }
+
 # ICMP capture
 pnet = "0.35"
 

@@ -61,6 +61,9 @@ async fn main() -> Result<()> {
     });
     info!("Protocol handlers starting...");
 
+    // Warm the cache for default time ranges
+    web::warm_cache(&db).await;
+
     // Start web server (blocking)
     web::start_server(&config, event_bus, db, geoip).await?;
 

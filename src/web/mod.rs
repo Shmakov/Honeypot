@@ -3,6 +3,8 @@
 mod routes;
 mod sse;
 
+pub use routes::warm_cache;
+
 use anyhow::Result;
 use axum::{
     body::Bytes,
