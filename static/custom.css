@@ -164,10 +164,12 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: white;
     font-family: system-ui, -apple-system, sans-serif;
-    font-size: 9px;
+    font-size: 10px;
+    /* Included slightly larger font for square look */
     font-weight: 800;
     padding: 0 4px;
-    border-radius: 9px;
+    border-radius: 3px;
+    /* Squarish look */
     line-height: 16px;
     height: 16px;
     min-width: 16px;
