@@ -164,17 +164,21 @@
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: white;
     font-family: system-ui, -apple-system, sans-serif;
-    font-size: 10px;
-    /* Included slightly larger font for square look */
+    font-size: 9px;
+    /* Smaller font */
     font-weight: 800;
-    padding: 0 4px;
+    padding: 0 3px;
     border-radius: 3px;
     /* Squarish look */
-    line-height: 16px;
-    height: 16px;
-    min-width: 16px;
+    line-height: 14px;
+    height: 14px;
+    /* Smaller height */
+    min-width: 14px;
+    /* Smaller width */
     text-align: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    z-index: 1000 !important;
+    /* Force on top */
     /* Reset Leaflet defaults */
     margin: 0;
 }

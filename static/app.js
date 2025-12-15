@@ -435,7 +435,8 @@ function updateMarkerIcon(markerData) {
             permanent: true,
             direction: 'center',
             className: 'badge-tooltip',
-            offset: [10, -10] // top-right
+            offset: [10, -10], // top-right
+            pane: 'popupPane' // Ensure it stays visible/on top of map layers, though popups might still cover it if they overlap directly.
         });
     } else if (count > 2) {
         // Just update the content of the existing permanent badge
