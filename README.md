@@ -1,9 +1,15 @@
 # Honeypot 🍯
 
-A modern, low-interaction network honeypot with real-time attack visualization.
+A low-interaction network honeypot with real-time attack visualization.
 
 ![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+
+## Demo
+
+Check out the **[Live Demo](https://echo.shmakov.net/)**.
+
+[![Live Demo](static/demo_screenshot.png)](https://echo.shmakov.net/)
 
 ## Features
 
@@ -30,27 +36,9 @@ sudo ./target/release/honeypot
 
 ## Configuration
 
-Edit `config.toml` or use environment variables (prefix: `HONEYPOT_`, nested: `__`):
+Edit [config.toml](config.toml) or use environment variables (prefix: `HONEYPOT_`, nested: `__`):
 
-```toml
-[server]
-host = "0.0.0.0"
-http_port = 80
-public_url = "https://honeypot.example.com"
-
-[database]
-driver = "sqlite"
-url = "honeypot.db"
-
-[geoip]
-database = "data/GeoLite2-City.mmdb"
-
-[emulation]
-ssh_banner = "SSH-2.0-OpenSSH_8.4p1"
-ftp_banner = "220 FTP Server ready"
-```
-
-See `.env.example` for all environment variable options.
+See [.env.example](.env.example) for all environment variable options.
 
 ## API Endpoints
 
@@ -88,7 +76,7 @@ sudo systemctl enable --now honeypot
 
 ### TLS with Caddy
 
-For HTTPS with automatic certificates, see [`deploy/CADDY.md`](deploy/CADDY.md).
+For HTTPS with automatic certificates, see [deploy/CADDY.md](deploy/CADDY.md).
 
 ## Tech Stack
 
