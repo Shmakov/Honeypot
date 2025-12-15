@@ -496,6 +496,20 @@ function addAttackDot(lat, lon, ip, service) {
         .bindTooltip(`${ip} • ${service}`, { direction: 'top', offset: [0, -2], className: 'map-tooltip' }) // Show info immediately
         .addTo(attackMap);
 
+    // Handle tooltip/badge visibility on popup interactions
+    marker.on('popupopen', () => {
+        // Hide tooltip/badge when popup is open (user requested this behavior)
+        marker.closeTooltip();
+    });
+
+    marker.on('popupclose', () => {
+        // Restore tooltip/badge when popup closes
+        // Only if it was supposed to be permanent (i.e. badge mode)
+        if (marker.getTooltip() && marker.getTooltip().options.permanent) {
+            marker.openTooltip();
+        }
+    });
+
     const markerData = {
         marker,
         count: 1,
