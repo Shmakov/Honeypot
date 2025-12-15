@@ -1,0 +1,17 @@
+# Search engines: only index home and stats pages
+# Other bots: allow everything (honeypot traps)
+
+# Major search engines - restrict to main pages only
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+User-agent: Baiduspider
+User-agent: YandexBot
+Disallow: /
+Allow: /
+Allow: /stats
+
+# All other bots - full access to honeypot traps
+User-agent: *
+Allow: /

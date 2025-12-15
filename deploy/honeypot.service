@@ -1,0 +1,24 @@
+[Unit]
+Description=Honeypot Network Security Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/honeypot
+ExecStart=/opt/honeypot/honeypot
+Restart=always
+RestartSec=5
+
+# Load environment variables from file
+EnvironmentFile=/opt/honeypot/.env
+
+# Security hardening (optional)
+NoNewPrivileges=false
+ProtectSystem=strict
+ReadWritePaths=/opt/honeypot
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target

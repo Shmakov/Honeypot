@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honeypot Dashboard</title>
+
+    <!-- Favicon and icons -->
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <link rel="apple-touch-icon" href="/static/apple-touch-icon.svg">
+    <meta name="theme-color" content="#1a1a2e">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Custom styles for animations and Leaflet -->
+    <link rel="stylesheet" href="/static/custom.css">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+</head>
+
+<body class="bg-gray-950 text-gray-100 dark:bg-gray-950 dark:text-gray-100 font-sans min-h-screen">
+    <!-- Light theme classes -->
+    <div id="app" class="min-h-screen">
+
+        <!-- Header -->
+        <header class="sticky top-0 z-[9999] backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-wrap items-center justify-between gap-y-3 py-3 sm:py-0 sm:h-16">
+                    <!-- Row 1 on mobile: Logo + Theme Toggle -->
+                    <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity order-1">
+                        <span class="text-2xl">🍯</span>
+                        <span
+                            class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Honeypot</span>
+                    </a>
+
+                    <button id="themeToggle"
+                        class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl order-2 sm:order-3"
+                        title="Toggle theme">🌙</button>
+
+                    <!-- Row 2 on mobile: Navigation -->
+                    <nav class="flex items-center gap-2 order-3 sm:order-2 w-full sm:w-auto">
+                        <a href="/"
+                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Dashboard</a>
+                        <a href="/stats"
+                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Statistics</a>
+                    </nav>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div id="totalRequests" class="text-3xl font-bold text-white">-</div>
+                    <div class="text-sm text-gray-500 mt-1">Total Requests</div>
+                </div>
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div id="sessionRequests" class="text-3xl font-bold text-white">0</div>
+                    <div class="text-sm text-gray-500 mt-1">This Session</div>
+                </div>
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div class="text-sm text-gray-500 mb-2">Recent Credentials</div>
+                    <div id="recentCredentials" class="space-y-1 font-mono text-sm">
+                        <div class="text-gray-600">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Feed -->
+            <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-lg font-semibold text-white">Live Request Feed</h3>
+                        <div id="connectionStatus"
+                            class="flex items-center gap-2 px-2.5 py-1 rounded-full bg-gray-800/50">
+                            <span class="status-dot w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                            <span class="status-text text-xs text-gray-400">Connecting...</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="pauseBtn"
+                            class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+                            title="Pause">⏸</button>
+                        <button id="clearBtn"
+                            class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+                            title="Clear">🗑</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-800/50">
+                            <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                <th class="px-6 py-3">Time</th>
+                                <th class="px-6 py-3">IP</th>
+                                <th class="px-6 py-3">Country</th>
+                                <th class="px-6 py-3">Service</th>
+                                <th class="px-6 py-3">Request</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feedBody" class="divide-y divide-gray-800">
+                            <!-- Request rows inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Request Map -->
+            <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-800">
+                    <h3 class="text-lg font-semibold text-white">Live Request Map</h3>
+                </div>
+                <div id="attackMap" class="h-80"></div>
+            </div>
+        </main>
+
+        <!-- Payload Modal -->
+        <div id="modalOverlay"
+            class="modal-overlay fixed inset-0 bg-black/70 backdrop-blur-md z-[99999] flex items-center justify-center opacity-0 invisible transition-all duration-300">
+            <div
+                class="modal bg-gradient-to-b from-gray-900 to-gray-950 border border-gray-700/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden m-4 transform scale-95 transition-transform duration-300 shadow-2xl">
+
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800/50 bg-gray-900/50">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xl">🔍</span>
+                        <h3 class="text-lg font-semibold text-white">Request Details</h3>
+                    </div>
+                    <button id="modalClose"
+                        class="p-2 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+                    <!-- Details Grid -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">IP Address</div>
+                            <div id="detailIp" class="font-mono text-sm text-white font-medium">-</div>
+                        </div>
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Country</div>
+                            <div id="detailCountry" class="text-sm text-white font-medium">-</div>
+                        </div>
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Service</div>
+                            <div id="detailService" class="text-sm text-white font-medium">-</div>
+                        </div>
+                        <div class="bg-gray-800/30 rounded-xl p-4">
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Port</div>
+                            <div id="detailPort" class="font-mono text-sm text-white font-medium">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Timestamp -->
+                    <div class="flex items-center gap-4 text-sm">
+                        <span class="text-gray-500">Timestamp:</span>
+                        <span id="detailTime" class="text-gray-300">-</span>
+                    </div>
+
+                    <!-- User-Agent -->
+                    <div id="userAgentRow" class="hidden">
+                        <div class="flex items-start gap-4 text-sm">
+                            <span class="text-gray-500 shrink-0">User-Agent:</span>
+                            <span id="detailUserAgent" class="text-gray-300 font-mono text-xs break-all">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Credentials (if present) -->
+                    <div id="credentialsRow" class="hidden">
+                        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-amber-400">🔐</span>
+                                <span class="text-xs text-amber-400 uppercase tracking-wide font-medium">Captured
+                                    Credentials</span>
+                            </div>
+                            <div id="detailCredentials" class="font-mono text-lg text-amber-300 font-semibold">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Request/Headers -->
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-cyan-400">📨</span>
+                            <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Request /
+                                Headers</span>
+                        </div>
+                        <pre id="detailRequest"
+                            class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm font-mono text-cyan-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin">No request data</pre>
+                    </div>
+
+                    <!-- Payload -->
+                    <div id="payloadSection" class="hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-green-400">📦</span>
+                            <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Body /
+                                Payload</span>
+                        </div>
+                        <pre id="detailPayload"
+                            class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm font-mono text-green-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin">No payload</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="max-w-7xl mx-auto px-6 lg:px-8 py-8 text-center text-gray-600 text-sm">
+            <a href="/" class="hover:text-gray-400 transition-colors">Honeypot Dashboard</a> •
+            <a href="https://github.com/Shmakov/Honeypot" target="_blank"
+                class="hover:text-gray-400 transition-colors">GitHub</a>
+        </footer>
+    </div>
+
+    <script src="/static/theme.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/utils.js"></script>
+    <script src="/static/map.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

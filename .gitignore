@@ -1,0 +1,14 @@
+# Build artifacts
+/target
+
+# Data files (download separately)
+/data/*.mmdb
+*.db
+*.db-shm
+*.db-wal
+
+# Environment
+.env
+
+# SSH host key (auto-generated)
+data/ssh_host_key

@@ -1,0 +1,24 @@
+# Honeypot Caddy TLS Proxy
+#
+# Port 80  → Honeypot (HTTP attacks)
+# Port 443 → Caddy → Honeypot (HTTPS dashboard)
+#
+# Usage:
+#   1. Copy to /etc/caddy/Caddyfile
+#   2. Replace honeypot.example.com with your domain
+#   3. sudo systemctl restart caddy
+
+# Disable HTTP redirect (honeypot needs port 80)
+{
+    auto_https disable_redirects
+}
+
+honeypot.example.com {
+    reverse_proxy localhost:80 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Port 443
+        header_up X-Forwarded-Proto https
+        flush_interval -1
+    }
+}
