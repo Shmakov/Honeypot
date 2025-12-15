@@ -84,7 +84,12 @@
     margin: 12px 16px;
 }
 
-/* Attack markers - use pixel positioning, not percentage+transform which conflicts with Leaflet zoom */
+/* Attack markers - SVG circle markers for correct positioning at all zoom levels */
+.attack-circle-marker {
+    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+}
+
+/* Legacy attack markers (keeping for stats page compatibility) */
 .attack-marker,
 .country-marker {
     position: relative;

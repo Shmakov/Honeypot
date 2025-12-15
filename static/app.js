@@ -418,21 +418,16 @@ function getLocationKey(lat, lon) {
 
 // Update marker icon with count badge
 function updateMarkerIcon(markerData) {
-    const { marker, count, service } = markerData;
-    const showBadge = count > 1;
+    const { marker, count } = markerData;
 
-    const attackIcon = L.divIcon({
-        className: 'attack-marker',
-        html: `
-            <div class="attack-pulse"></div>
-            <div class="attack-dot" data-service="${service}"></div>
-            ${showBadge ? `<div class="attack-count-badge">${count > 99 ? '99+' : count}</div>` : ''}
-        `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-    });
+    // Increase radius slightly based on count (max 12px)
+    const newRadius = Math.min(6 + Math.log2(count) * 2, 12);
+    marker.setRadius(newRadius);
 
-    marker.setIcon(attackIcon);
+    // Update tooltip with count
+    if (count > 1) {
+        marker.setTooltipContent(`${count} requests`);
+    }
 }
 
 // Add an attack dot to the map
@@ -448,7 +443,7 @@ function addAttackDot(lat, lon, ip, service) {
         markerData.ips.add(ip);
         markerData.services.add(service);
 
-        // Update the icon to show new count
+        // Update the marker size/tooltip
         updateMarkerIcon(markerData);
 
         // Update popup content
@@ -473,16 +468,18 @@ function addAttackDot(lat, lon, ip, service) {
         return;
     }
 
-    // Create new marker
-    const attackIcon = L.divIcon({
-        className: 'attack-marker',
-        html: `<div class="attack-pulse"></div><div class="attack-dot" data-service="${service}"></div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
-    });
-
-    const marker = L.marker([lat, lon], { icon: attackIcon })
+    // Create new circleMarker (SVG-based, positions correctly at all zoom levels)
+    const marker = L.circleMarker([lat, lon], {
+        radius: 6,
+        fillColor: '#ef4444',
+        fillOpacity: 0.8,
+        color: '#ef4444',
+        weight: 2,
+        opacity: 0.6,
+        className: 'attack-circle-marker'
+    })
         .bindPopup(`<div style="font-family: inherit"><strong>${ip}</strong><br><span style="color: #888">${service}</span></div>`)
+        .bindTooltip('', { permanent: false, direction: 'top' })
         .addTo(attackMap);
 
     const markerData = {
