@@ -9,7 +9,13 @@ A low-interaction network honeypot with real-time attack visualization.
 
 Check out the **[Live Demo](https://echo.shmakov.net/)**.
 
-[![Live Demo](static/demo_screenshot.png)](https://echo.shmakov.net/)
+<a href="https://echo.shmakov.net/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/demo_dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="static/demo_light.png">
+    <img alt="Live Demo" src="static/demo_dark.png">
+  </picture>
+</a>
 
 ## Features
 
