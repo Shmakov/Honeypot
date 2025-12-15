@@ -420,11 +420,11 @@ function getLocationKey(lat, lon) {
 function updateMarkerIcon(markerData) {
     const { marker, count } = markerData;
 
-    // Increase radius slightly based on count (max 12px)
-    const newRadius = Math.min(6 + Math.log2(count) * 2, 12);
+    // Increase radius based on count (start at 4px, max 16px)
+    const newRadius = Math.min(4 + Math.log2(count) * 3, 16);
     marker.setRadius(newRadius);
 
-    // Update tooltip with count
+    // Update tooltip with count if multiple requests
     if (count > 1) {
         marker.setTooltipContent(`${count} requests`);
     }
@@ -470,16 +470,16 @@ function addAttackDot(lat, lon, ip, service) {
 
     // Create new circleMarker (SVG-based, positions correctly at all zoom levels)
     const marker = L.circleMarker([lat, lon], {
-        radius: 6,
+        radius: 4,               // Smaller initial size (was 6)
         fillColor: '#ef4444',
-        fillOpacity: 0.8,
+        fillOpacity: 0.9,
         color: '#ef4444',
-        weight: 2,
-        opacity: 0.6,
+        weight: 1,               // Thinner border
+        opacity: 0.8,
         className: 'attack-circle-marker'
     })
         .bindPopup(`<div style="font-family: inherit"><strong>${ip}</strong><br><span style="color: #888">${service}</span></div>`)
-        .bindTooltip('', { permanent: false, direction: 'top' })
+        .bindTooltip(`${ip} • ${service}`, { direction: 'top', offset: [0, -2], className: 'map-tooltip' }) // Show info immediately
         .addTo(attackMap);
 
     const markerData = {

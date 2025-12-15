@@ -101,24 +101,52 @@
     margin: 12px 16px;
 }
 
-/* Attack markers - SVG circle markers for correct positioning at all zoom levels */
+/* Attack markers - SVG circle markers */
 .attack-circle-marker {
-    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9));
-    animation: circleMarkerPulse 2s ease-in-out infinite;
+    /* Subtle static glow */
+    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+    /* Very subtle breathing animation */
+    animation: subtleBreathing 4s ease-in-out infinite;
+    transform-origin: center;
 }
 
-@keyframes circleMarkerPulse {
-
-    0%,
-    100% {
-        filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
-        opacity: 0.9;
+@keyframes subtleBreathing {
+    0%, 100% {
+        opacity: 0.8;
+        stroke-width: 1px;
     }
-
     50% {
-        filter: drop-shadow(0 0 16px rgba(239, 68, 68, 1)) drop-shadow(0 0 24px rgba(239, 68, 68, 0.6));
         opacity: 1;
+        stroke-width: 2px;
     }
+}
+
+/* Custom Map Tooltip */
+.map-tooltip {
+    background: rgba(31, 41, 55, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #f3f4f6;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.map-tooltip::before {
+    border-top-color: rgba(31, 41, 55, 0.95);
+}
+
+/* Light theme tooltip overrides */
+[data-theme="light"] .map-tooltip {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #1f2937;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .map-tooltip::before {
+    border-top-color: rgba(255, 255, 255, 0.95);
 }
 
 /* Legacy attack markers (keeping for stats page compatibility) */
