@@ -313,9 +313,11 @@ body {
     background: var(--bg-card);
 }
 
-/* Attack marker styles */
+/* Attack marker styles - use pixel positioning to avoid Leaflet zoom conflicts */
 .attack-marker {
     position: relative;
+    width: 24px;
+    height: 24px;
 }
 
 .attack-dot {
@@ -324,9 +326,9 @@ body {
     background: var(--accent-danger);
     border-radius: 50%;
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    /* Center 10px dot in 24px container: (24-10)/2 = 7 */
+    top: 7px;
+    left: 7px;
     box-shadow: 0 0 10px var(--accent-danger);
     z-index: 2;
 }
@@ -338,21 +340,21 @@ body {
     background: var(--accent-danger);
     opacity: 0.4;
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    /* Center 20px pulse in 24px container: (24-20)/2 = 2 */
+    top: 2px;
+    left: 2px;
     animation: pulseRing 1.5s ease-out infinite;
     z-index: 1;
 }
 
 @keyframes pulseRing {
     0% {
-        transform: translate(-50%, -50%) scale(0.5);
+        transform: scale(0.5);
         opacity: 0.6;
     }
 
     100% {
-        transform: translate(-50%, -50%) scale(2);
+        transform: scale(2);
         opacity: 0;
     }
 }

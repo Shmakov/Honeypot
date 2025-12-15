@@ -84,10 +84,13 @@
     margin: 12px 16px;
 }
 
-/* Attack markers */
+/* Attack markers - use pixel positioning, not percentage+transform which conflicts with Leaflet zoom */
 .attack-marker,
 .country-marker {
     position: relative;
+    /* Explicit size to match Leaflet iconSize */
+    width: 24px;
+    height: 24px;
 }
 
 .attack-dot {
@@ -96,9 +99,9 @@
     background: #ef4444;
     border-radius: 50%;
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    /* Center 12px dot in 24px container: (24-12)/2 = 6 */
+    top: 6px;
+    left: 6px;
     box-shadow: 0 0 12px #ef4444, 0 0 24px rgba(239, 68, 68, 0.5);
     z-index: 2;
 }
@@ -110,21 +113,21 @@
     background: #ef4444;
     opacity: 0.4;
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    /* 24px pulse fills 24px container */
+    top: 0;
+    left: 0;
     animation: pulseRing 1.5s ease-out infinite;
     z-index: 1;
 }
 
 @keyframes pulseRing {
     0% {
-        transform: translate(-50%, -50%) scale(0.5);
+        transform: scale(0.5);
         opacity: 0.6;
     }
 
     100% {
-        transform: translate(-50%, -50%) scale(2.5);
+        transform: scale(2.5);
         opacity: 0;
     }
 }
