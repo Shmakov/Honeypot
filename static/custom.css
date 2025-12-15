@@ -103,7 +103,22 @@
 
 /* Attack markers - SVG circle markers for correct positioning at all zoom levels */
 .attack-circle-marker {
-    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9));
+    animation: circleMarkerPulse 2s ease-in-out infinite;
+}
+
+@keyframes circleMarkerPulse {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+        opacity: 0.9;
+    }
+
+    50% {
+        filter: drop-shadow(0 0 16px rgba(239, 68, 68, 1)) drop-shadow(0 0 24px rgba(239, 68, 68, 0.6));
+        opacity: 1;
+    }
 }
 
 /* Legacy attack markers (keeping for stats page compatibility) */
