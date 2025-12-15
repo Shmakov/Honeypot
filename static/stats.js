@@ -2,6 +2,9 @@
  * Honeypot Statistics Page
  */
 
+// Allowed time ranges (in hours) - must match backend ALLOWED_HOURS
+const ALLOWED_HOURS = [24, 168, 720, 8760];
+
 // Map globals - uses shared TILE_URLS from map.js
 let statsMap = null;
 let countryMarkers = [];
@@ -11,6 +14,7 @@ class StatsPage {
     constructor() {
         this.charts = {};
         this.countriesData = [];
+        this.loadingOverlay = document.getElementById('loadingOverlay');
         this.init();
     }
 
@@ -102,7 +106,12 @@ class StatsPage {
     }
 
     async loadData() {
-        const hours = document.getElementById('timeRange').value;
+        const select = document.getElementById('timeRange');
+        const hours = parseInt(select.value, 10);
+
+        // Show loading overlay and disable select
+        this.showLoading(true);
+        select.disabled = true;
 
         try {
             const [statsResponse, countriesResponse, locationsResponse] = await Promise.all([
@@ -110,6 +119,12 @@ class StatsPage {
                 fetch(`/api/countries?hours=${hours}`),
                 fetch(`/api/locations?hours=${hours}`)
             ]);
+
+            // Check for API errors (invalid hours returns 400)
+            if (!statsResponse.ok || !countriesResponse.ok || !locationsResponse.ok) {
+                const errorResp = await statsResponse.json().catch(() => ({}));
+                throw new Error(errorResp.error || 'Failed to load statistics');
+            }
 
             const stats = await statsResponse.json();
             const countries = await countriesResponse.json();
@@ -125,6 +140,26 @@ class StatsPage {
 
         } catch (error) {
             console.error('Failed to load stats:', error);
+            // Show error in a visible way
+            const totalEl = document.getElementById('totalRequests');
+            if (totalEl) totalEl.textContent = 'Error';
+        } finally {
+            // Hide loading overlay and re-enable select
+            this.showLoading(false);
+            select.disabled = false;
+        }
+    }
+
+    /**
+     * Show or hide the loading overlay
+     */
+    showLoading(show) {
+        if (this.loadingOverlay) {
+            if (show) {
+                this.loadingOverlay.classList.add('active');
+            } else {
+                this.loadingOverlay.classList.remove('active');
+            }
         }
     }
 

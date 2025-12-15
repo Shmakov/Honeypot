@@ -2,7 +2,8 @@
 
 use axum::{
     extract::{Query, State},
-    response::Html,
+    http::StatusCode,
+    response::{Html, IntoResponse, Response},
     Json,
 };
 use cached::proc_macro::cached;
@@ -11,6 +12,18 @@ use std::sync::Arc;
 
 use super::AppState;
 use crate::db::{AttackEvent, CountryStat, CredentialStat, Database, LocationStat, PathStat, ServiceStat};
+
+/// API error response
+#[derive(Debug, Serialize)]
+pub struct ApiError {
+    error: String,
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (StatusCode::BAD_REQUEST, Json(self)).into_response()
+    }
+}
 
 /// Serve the main dashboard page
 pub async fn index() -> Html<&'static str> {
@@ -34,7 +47,21 @@ pub struct StatsQuery {
 }
 
 fn default_hours() -> i64 {
-    24
+    720 // Default to 30 days (matches stats page default selection)
+}
+
+/// Allowed time ranges (in hours) - matches frontend dropdown options
+pub const ALLOWED_HOURS: [i64; 4] = [24, 168, 720, 8760];
+
+/// Validate hours parameter - returns Ok(hours) or Err with API error
+fn validate_hours(hours: i64) -> Result<i64, ApiError> {
+    if ALLOWED_HOURS.contains(&hours) {
+        Ok(hours)
+    } else {
+        Err(ApiError {
+            error: format!("Invalid hours value '{}'. Allowed: 24, 168, 720, 8760", hours),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -88,8 +115,9 @@ async fn get_cached_recent_credentials(db: Database) -> Vec<(String, String)> {
 pub async fn api_stats(
     State(state): State<Arc<AppState>>,
     Query(query): Query<StatsQuery>,
-) -> Json<StatsResponse> {
-    Json(get_cached_stats(query.hours, state.db.clone()).await)
+) -> Result<Json<StatsResponse>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    Ok(Json(get_cached_stats(hours, state.db.clone()).await))
 }
 
 #[derive(Debug, Serialize)]
@@ -121,16 +149,18 @@ pub async fn api_recent(State(state): State<Arc<AppState>>) -> Json<RecentRespon
 pub async fn api_countries(
     State(state): State<Arc<AppState>>,
     Query(query): Query<StatsQuery>,
-) -> Json<Vec<CountryStat>> {
-    Json(get_cached_countries(query.hours, state.db.clone()).await)
+) -> Result<Json<Vec<CountryStat>>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    Ok(Json(get_cached_countries(hours, state.db.clone()).await))
 }
 
 /// API: Get location data for map (cached for 5 minutes)
 pub async fn api_locations(
     State(state): State<Arc<AppState>>,
     Query(query): Query<StatsQuery>,
-) -> Json<Vec<LocationStat>> {
-    Json(get_cached_locations(query.hours, state.db.clone()).await)
+) -> Result<Json<Vec<LocationStat>>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    Ok(Json(get_cached_locations(hours, state.db.clone()).await))
 }
 
 /// Warm the cache for the default time range (called on startup)

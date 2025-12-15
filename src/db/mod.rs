@@ -5,7 +5,7 @@ mod schema;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Sqlite, SqlitePool};
+use sqlx::{Pool, Sqlite, sqlite::SqlitePoolOptions};
 
 use crate::config::DatabaseConfig;
 
@@ -82,7 +82,13 @@ pub struct Database {
 
 impl Database {
     pub async fn new(config: &DatabaseConfig) -> Result<Self> {
-        let pool = SqlitePool::connect(&format!("sqlite:{}?mode=rwc", config.url)).await?;
+        // Configure pool with explicit settings for better read concurrency:
+        // - max_connections: 4 allows parallel reads (SQLite supports concurrent readers)
+        // - cache=shared: Improves read performance by sharing page cache between connections
+        let pool = SqlitePoolOptions::new()
+            .max_connections(4)
+            .connect(&format!("sqlite:{}?mode=rwc&cache=shared", config.url))
+            .await?;
         Ok(Self { pool })
     }
 

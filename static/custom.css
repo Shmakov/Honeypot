@@ -1,6 +1,68 @@
 /* Custom CSS for animations and Leaflet overrides */
 /* Tailwind handles most styling, this is for extras */
 
+/* ===== LOADING OVERLAY ===== */
+.stats-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9998;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.stats-loading-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.stats-loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #f59e0b;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.stats-loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    color: #f9fafb;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Light mode loading overlay */
+[data-theme="light"] .stats-loading-overlay {
+    background: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="light"] .stats-loading-content {
+    color: #1a202c;
+}
+
+[data-theme="light"] .stats-loading-spinner {
+    border-color: rgba(0, 0, 0, 0.1);
+    border-top-color: #d97706;
+}
+
 /* Modal transitions */
 .modal-overlay.active {
     opacity: 1 !important;
