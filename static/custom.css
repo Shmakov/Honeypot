@@ -177,14 +177,24 @@
     /* Smaller width */
     text-align: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-    z-index: 1000 !important;
-    /* Force on top */
+    /* Layering: visible but below popups */
+    z-index: 500;
+    /* Interaction improvements */
+    pointer-events: none;
+    /* Let clicks pass through to marker/map */
+    user-select: none;
+    /* Prevent text selection */
     /* Reset Leaflet defaults */
     margin: 0;
 }
 
 .badge-tooltip::before {
     display: none !important;
+}
+
+/* Ensure popups are always on top of everything */
+.leaflet-popup {
+    z-index: 2000 !important;
 }
 
 /* Legacy attack markers (keeping for stats page compatibility) */
