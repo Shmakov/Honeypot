@@ -103,30 +103,47 @@
 
 /* Attack markers - SVG circle markers */
 .attack-circle-marker {
-    /* Initial state */
-    filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
-    /* Beacon heartbeat animation */
-    animation: activeBeacon 2s ease-in-out infinite;
-    transform-origin: center;
+    /* Ambient glow animation - slow and subtle */
+    filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.6));
+    animation: softGlow 5s ease-in-out infinite;
+    /* Stagger via custom property set in JS */
+    animation-delay: var(--stagger-delay, 0s);
 }
 
-@keyframes activeBeacon {
+/* Entrance animation - applied temporarily when marker first appears */
+.attack-circle-marker.marker-entering {
+    animation: markerEnter 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes markerEnter {
     0% {
-        fill-opacity: 0.7;
-        stroke-opacity: 0.7;
-        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
+        transform: scale(0);
+        opacity: 0;
+        filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0));
     }
 
-    50% {
-        fill-opacity: 1;
-        stroke-opacity: 1;
-        filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9));
+    60% {
+        transform: scale(1.5);
+        opacity: 1;
+        filter: drop-shadow(0 0 20px rgba(239, 68, 68, 1));
     }
 
     100% {
-        fill-opacity: 0.7;
-        stroke-opacity: 0.7;
-        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
+        transform: scale(1);
+        opacity: 1;
+        filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.7));
+    }
+}
+
+@keyframes softGlow {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5));
+    }
+
+    50% {
+        filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.9));
     }
 }
 

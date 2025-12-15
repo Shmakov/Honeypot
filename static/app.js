@@ -416,8 +416,7 @@ function getLocationKey(lat, lon) {
     return `${lat.toFixed(2)},${lon.toFixed(2)}`;
 }
 
-// Update marker icon with count badge
-// Update marker icon with count badge
+// Update marker radius and badge based on request count
 function updateMarkerIcon(markerData) {
     const { marker, count } = markerData;
 
@@ -493,8 +492,21 @@ function addAttackDot(lat, lon, ip, service) {
         className: 'attack-circle-marker'
     })
         .bindPopup(`<div style="font-family: inherit"><strong>${ip}</strong><br><span style="color: #888">${service}</span></div>`)
-        .bindTooltip(`${ip} • ${service}`, { direction: 'top', offset: [0, -2], className: 'map-tooltip' }) // Show info immediately
+        .bindTooltip(`${ip} • ${service}`, { direction: 'top', offset: [0, -2], className: 'map-tooltip' })
         .addTo(attackMap);
+
+    // Apply entrance animation
+    const markerElement = marker.getElement();
+    if (markerElement) {
+        // Add entrance class for pop-in effect
+        markerElement.classList.add('marker-entering');
+        // Set random stagger delay for ambient animation (0-4s range within 5s cycle)
+        markerElement.style.setProperty('--stagger-delay', `${Math.random() * 4}s`);
+        // Remove entrance class after animation completes to allow ambient glow
+        setTimeout(() => {
+            markerElement.classList.remove('marker-entering');
+        }, 600); // Match CSS animation duration
+    }
 
     // Handle tooltip/badge visibility on popup interactions
     marker.on('popupopen', () => {
