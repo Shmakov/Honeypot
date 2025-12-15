@@ -417,11 +417,12 @@ function getLocationKey(lat, lon) {
 }
 
 // Update marker icon with count badge
+// Update marker icon with count badge
 function updateMarkerIcon(markerData) {
     const { marker, count } = markerData;
 
-    // Increase radius based on count (start at 4px, max 16px)
-    const newRadius = Math.min(4 + Math.log2(count) * 3, 16);
+    // Increase radius based on count (start at 3px, max 10px)
+    const newRadius = Math.min(3 + Math.log2(count) * 2, 10);
     marker.setRadius(newRadius);
 
     // Update tooltip with count if multiple requests
@@ -470,11 +471,11 @@ function addAttackDot(lat, lon, ip, service) {
 
     // Create new circleMarker (SVG-based, positions correctly at all zoom levels)
     const marker = L.circleMarker([lat, lon], {
-        radius: 4,               // Smaller initial size (was 6)
+        radius: 3,               // Smaller initial size (was 4)
         fillColor: '#ef4444',
         fillOpacity: 0.9,
         color: '#ef4444',
-        weight: 1,               // Thinner border
+        weight: 1,
         opacity: 0.8,
         className: 'attack-circle-marker'
     })

@@ -103,21 +103,30 @@
 
 /* Attack markers - SVG circle markers */
 .attack-circle-marker {
-    /* Subtle static glow */
-    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
-    /* Very subtle breathing animation */
-    animation: subtleBreathing 4s ease-in-out infinite;
+    /* Initial state */
+    filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
+    /* Beacon heartbeat animation */
+    animation: activeBeacon 2s ease-in-out infinite;
     transform-origin: center;
 }
 
-@keyframes subtleBreathing {
-    0%, 100% {
-        opacity: 0.8;
-        stroke-width: 1px;
+@keyframes activeBeacon {
+    0% {
+        fill-opacity: 0.7;
+        stroke-opacity: 0.7;
+        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
     }
+
     50% {
-        opacity: 1;
-        stroke-width: 2px;
+        fill-opacity: 1;
+        stroke-opacity: 1;
+        filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.9));
+    }
+
+    100% {
+        fill-opacity: 0.7;
+        stroke-opacity: 0.7;
+        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
     }
 }
 
