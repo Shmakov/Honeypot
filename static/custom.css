@@ -103,9 +103,9 @@
 
 /* Attack markers - SVG circle markers */
 .attack-circle-marker {
-    /* Ambient glow animation - slow and subtle */
+    /* Ambient glow animation - visible pulsing */
     filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.6));
-    animation: softGlow 5s ease-in-out infinite;
+    animation: softGlow 3s ease-in-out infinite;
     /* Stagger via custom property set in JS */
     animation-delay: var(--stagger-delay, 0s);
 }
