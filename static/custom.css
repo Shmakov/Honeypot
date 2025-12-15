@@ -64,6 +64,23 @@
     background: #1a1a2e !important;
 }
 
+/* Taller map on larger screens */
+@media (min-width: 768px) {
+
+    #attackMap,
+    #statsMap {
+        height: 450px !important;
+    }
+}
+
+@media (min-width: 1024px) {
+
+    #attackMap,
+    #statsMap {
+        height: 550px !important;
+    }
+}
+
 .leaflet-container {
     background: #1a1a2e !important;
     font-family: inherit;
