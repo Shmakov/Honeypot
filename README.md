@@ -3,7 +3,6 @@
 A low-interaction network honeypot with real-time attack visualization.
 
 ![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)
-![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## Demo
 
@@ -90,8 +89,4 @@ For HTTPS with automatic certificates, see [deploy/CADDY.md](deploy/CADDY.md).
 - **Frontend**: Vanilla JS, CSS (glassmorphism)
 - **Real-time**: Server-Sent Events (SSE)
 - **GeoIP**: MaxMind GeoLite2
-
-## License
-
-MIT
 

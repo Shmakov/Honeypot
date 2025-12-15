@@ -139,11 +139,13 @@
 
     0%,
     100% {
-        filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.5));
+        filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.4));
     }
 
     50% {
-        filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.9));
+        /* Multiple layered shadows for halo effect */
+        filter:
+            drop-shadow(0 0 8px rgba(239, 68, 68, 1)) drop-shadow(0 0 20px rgba(239, 68, 68, 0.8)) drop-shadow(0 0 35px rgba(239, 68, 68, 0.4));
     }
 }
 

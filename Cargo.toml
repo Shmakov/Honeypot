@@ -3,7 +3,6 @@ name = "honeypot"
 version = "0.1.0"
 edition = "2021"
 description = "A modern honeypot with real-time dashboard and attack visualization"
-license = "MIT"
 
 [dependencies]
 # Async runtime
