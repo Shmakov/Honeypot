@@ -425,9 +425,21 @@ function updateMarkerIcon(markerData) {
     const newRadius = Math.min(3 + Math.log2(count) * 2, 10);
     marker.setRadius(newRadius);
 
-    // Update tooltip with count if multiple requests
-    if (count > 1) {
-        marker.setTooltipContent(`${count} requests`);
+    // Update tooltip:
+    // If count > 1, show permanent badge (mimicking the old UI)
+    // If count == 1, keeping the existing hover tooltip (IP • Service)
+    if (count === 2) {
+        // Switching from single to multiple: Unbind hover tooltip, bind permanent badge
+        marker.unbindTooltip();
+        marker.bindTooltip(`${count}`, {
+            permanent: true,
+            direction: 'center',
+            className: 'badge-tooltip',
+            offset: [10, -10] // top-right
+        });
+    } else if (count > 2) {
+        // Just update the content of the existing permanent badge
+        marker.setTooltipContent(`${count > 99 ? '99+' : count}`);
     }
 }
 

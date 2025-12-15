@@ -158,6 +158,29 @@
     border-top-color: rgba(255, 255, 255, 0.95);
 }
 
+/* Badge Tooltip (Permanent count) */
+.badge-tooltip {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 0 4px;
+    border-radius: 9px;
+    line-height: 16px;
+    height: 16px;
+    min-width: 16px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    /* Reset Leaflet defaults */
+    margin: 0;
+}
+
+.badge-tooltip::before {
+    display: none !important;
+}
+
 /* Legacy attack markers (keeping for stats page compatibility) */
 .attack-marker,
 .country-marker {
