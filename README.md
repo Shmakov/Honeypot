@@ -24,8 +24,8 @@ Check out the **[Live Demo](https://echo.shmakov.net/)**.
 
 ```bash
 # Clone and build
-git clone <repo>
-cd honeypot
+git clone https://github.com/Shmakov/Honeypot.git
+cd Honeypot
 cargo build --release
 
 # Optional: Download GeoIP database from MaxMind and place in data/GeoLite2-City.mmdb
