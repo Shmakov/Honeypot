@@ -2,7 +2,7 @@ name: Build and Release
 
 on:
   push:
-    branches: [main, new]
+    branches: [main]
     tags:
       - 'v*'
   pull_request:
@@ -71,11 +71,11 @@ jobs:
           path: honeypot-linux.tar.gz
           retention-days: 30
 
-  # Deploy to GCP when pushing to main/new or manual trigger
+  # Deploy to GCP when pushing to main or manual trigger
   deploy:
     name: Deploy to GCP
     needs: build
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/new') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     
     steps:

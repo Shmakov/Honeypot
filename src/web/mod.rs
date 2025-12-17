@@ -9,7 +9,7 @@ pub use routes::warm_cache;
 use anyhow::Result;
 use axum::{
     extract::{ConnectInfo, Request, State},
-    http::{header, HeaderMap, HeaderValue, Method, StatusCode},
+    http::{header, HeaderValue, Method, StatusCode},
     response::IntoResponse,
     routing::{any, get},
     Router,

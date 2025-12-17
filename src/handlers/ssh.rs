@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
-use russh::server::{Auth, Config, Handler, Server, Session};
+use russh::server::{Auth, Config, Handler, Server};
 use russh_keys::key::KeyPair;
 
 use crate::config::Config as AppConfig;
