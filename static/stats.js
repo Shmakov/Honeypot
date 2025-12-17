@@ -318,7 +318,7 @@ class StatsPage {
             return;
         }
 
-        tbody.innerHTML = credentials.slice(0, 10).map(c => `
+        tbody.innerHTML = credentials.map(c => `
             <tr class="hover:bg-gray-800/30 transition-colors">
                 <td class="px-6 py-3 font-mono text-sm">${this.formatCredential(c.username, 'text-amber-400')}</td>
                 <td class="px-6 py-3 font-mono text-sm">${this.formatCredential(c.password, 'text-red-400')}</td>
@@ -342,7 +342,7 @@ class StatsPage {
             return;
         }
 
-        tbody.innerHTML = paths.slice(0, 10).map(p => `
+        tbody.innerHTML = paths.map(p => `
             <tr class="hover:bg-gray-800/30 transition-colors">
                 <td class="px-6 py-3 font-mono text-sm text-blue-400 truncate max-w-xs" title="${this.escapeHtml(p.path)}">${this.escapeHtml(this.truncate(p.path, 40))}</td>
                 <td class="px-6 py-3 text-sm text-gray-400 text-right tabular-nums">${p.count.toLocaleString()}</td>
