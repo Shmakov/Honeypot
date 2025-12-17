@@ -82,30 +82,40 @@ pub struct Database {
 
 impl Database {
     pub async fn new(config: &DatabaseConfig) -> Result<Self> {
+        // Convert MB to KB for PRAGMA cache_size (negative value = KB)
+        let cache_size_kb = (config.cache_size_mb as i32) * 1000;
+        
         // Configure pool with explicit settings for better read concurrency:
         // - max_connections: 4 allows parallel reads (SQLite supports concurrent readers)
-        // - cache=shared: Improves read performance by sharing page cache between connections
+        // - cache=shared: All connections share one page cache (total = cache_size_mb)
+        // - after_connect: Apply PRAGMAs to every connection in the pool
         let pool = SqlitePoolOptions::new()
             .max_connections(4)
+            .after_connect(move |conn, _meta| {
+                Box::pin(async move {
+                    // Performance: Reduce fsync calls (safe with WAL mode)
+                    sqlx::query("PRAGMA synchronous = NORMAL")
+                        .execute(&mut *conn)
+                        .await?;
+                    // Performance: Configurable page cache (with cache=shared, this is the total)
+                    sqlx::query(&format!("PRAGMA cache_size = -{}", cache_size_kb))
+                        .execute(&mut *conn)
+                        .await?;
+                    // Performance: Keep temp tables in memory
+                    sqlx::query("PRAGMA temp_store = MEMORY")
+                        .execute(&mut *conn)
+                        .await?;
+                    Ok(())
+                })
+            })
             .connect(&format!("sqlite:{}?mode=rwc&cache=shared", config.url))
             .await?;
         Ok(Self { pool })
     }
 
     pub async fn run_migrations(&self) -> Result<()> {
-        // Enable WAL mode for better concurrency
+        // Enable WAL mode for better concurrency (persists at database level, only needs to run once)
         sqlx::query("PRAGMA journal_mode=WAL")
-            .execute(&self.pool)
-            .await?;
-        sqlx::query("PRAGMA synchronous=NORMAL")
-            .execute(&self.pool)
-            .await?;
-        // Performance: 16MB cache (safe for 1GB server, default is 2MB)
-        sqlx::query("PRAGMA cache_size = -16000")
-            .execute(&self.pool)
-            .await?;
-        // Performance: Keep temp tables in memory
-        sqlx::query("PRAGMA temp_store = MEMORY")
             .execute(&self.pool)
             .await?;
         

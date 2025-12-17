@@ -28,6 +28,14 @@ pub struct ServerConfig {
 pub struct DatabaseConfig {
     pub driver: String,
     pub url: String,
+    /// SQLite page cache size in MB (default: 16). With cache=shared, this is the total
+    /// shared cache across all pool connections. Set based on available server memory.
+    #[serde(default = "default_cache_size_mb")]
+    pub cache_size_mb: u32,
+}
+
+fn default_cache_size_mb() -> u32 {
+    16
 }
 
 #[derive(Debug, Clone, Deserialize)]
