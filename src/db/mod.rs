@@ -287,7 +287,7 @@ impl Database {
 
     // ==================== STATS OPERATIONS (HYBRID: ROLLUP + LIVE) ====================
 
-    /// Get stats using hybrid approach: rollup for complete days, live query for today
+    /// Get stats using hybrid approach: rollup for complete days, live query for today (only for <24h range)
     /// 
     /// Note: First partial day is excluded from rollup (slight under-count is acceptable)
     pub async fn get_stats_hybrid(&self, since_hours: i64) -> Result<StatsResponse> {
@@ -308,16 +308,21 @@ impl Database {
             StatsResponse { total: 0, services: vec![], credentials: vec![], paths: vec![] }
         };
         
-        // Get live data for today only
-        let live = self.get_live_stats(today_start).await?;
-        
-        // Merge results
-        Ok(StatsResponse {
-            total: rollup.total + live.total,
-            services: merge_service_stats(rollup.services, live.services),
-            credentials: merge_credential_stats(rollup.credentials, live.credentials),
-            paths: merge_path_stats(rollup.paths, live.paths),
-        })
+        // Only add live data for short time ranges (< 24 hours)
+        // For 30-day/7-day queries, today's partial data is negligible and live query is too slow
+        if since_hours < 24 {
+            let live = self.get_live_stats(since_ts).await?;
+            
+            // Merge results
+            Ok(StatsResponse {
+                total: rollup.total + live.total,
+                services: merge_service_stats(rollup.services, live.services),
+                credentials: merge_credential_stats(rollup.credentials, live.credentials),
+                paths: merge_path_stats(rollup.paths, live.paths),
+            })
+        } else {
+            Ok(rollup)
+        }
     }
 
     /// Get stats from rollup table for complete days
@@ -519,21 +524,23 @@ impl Database {
             }
         }
         
-        // Add live data for today
-        let live_rows: Vec<(String, i64)> = sqlx::query_as(
-            r#"
-            SELECT country_code, COUNT(*) as count 
-            FROM requests 
-            WHERE timestamp > ? AND country_code IS NOT NULL 
-            GROUP BY country_code
-            "#
-        )
-        .bind(today_start)
-        .fetch_all(&self.pool)
-        .await?;
-        
-        for (code, count) in live_rows {
-            *countries.entry(code).or_insert(0) += count;
+        // Only add live data for short time ranges (< 24 hours)
+        if since_hours < 24 {
+            let live_rows: Vec<(String, i64)> = sqlx::query_as(
+                r#"
+                SELECT country_code, COUNT(*) as count 
+                FROM requests 
+                WHERE timestamp > ? AND country_code IS NOT NULL 
+                GROUP BY country_code
+                "#
+            )
+            .bind(since_ts)
+            .fetch_all(&self.pool)
+            .await?;
+            
+            for (code, count) in live_rows {
+                *countries.entry(code).or_insert(0) += count;
+            }
         }
         
         let mut result: Vec<CountryStat> = countries.into_iter()
@@ -577,22 +584,24 @@ impl Database {
             }
         }
         
-        // Add live data for today
-        let live_rows: Vec<(f64, f64, i64)> = sqlx::query_as(
-            r#"
-            SELECT ROUND(latitude, 1) as lat, ROUND(longitude, 1) as lon, COUNT(*) as count 
-            FROM requests 
-            WHERE timestamp > ? AND latitude IS NOT NULL AND longitude IS NOT NULL 
-            GROUP BY ROUND(latitude, 1), ROUND(longitude, 1)
-            "#
-        )
-        .bind(today_start)
-        .fetch_all(&self.pool)
-        .await?;
-        
-        for (lat, lon, count) in live_rows {
-            let key = ((lat * 10.0) as i64, (lon * 10.0) as i64);
-            *locations.entry(key).or_insert(0) += count;
+        // Only add live data for short time ranges (< 24 hours)
+        if since_hours < 24 {
+            let live_rows: Vec<(f64, f64, i64)> = sqlx::query_as(
+                r#"
+                SELECT ROUND(latitude, 1) as lat, ROUND(longitude, 1) as lon, COUNT(*) as count 
+                FROM requests 
+                WHERE timestamp > ? AND latitude IS NOT NULL AND longitude IS NOT NULL 
+                GROUP BY ROUND(latitude, 1), ROUND(longitude, 1)
+                "#
+            )
+            .bind(since_ts)
+            .fetch_all(&self.pool)
+            .await?;
+            
+            for (lat, lon, count) in live_rows {
+                let key = ((lat * 10.0) as i64, (lon * 10.0) as i64);
+                *locations.entry(key).or_insert(0) += count;
+            }
         }
         
         let mut result: Vec<LocationStat> = locations.into_iter()
@@ -610,7 +619,7 @@ impl Database {
 
     // ==================== IP STATS ====================
 
-    /// Get top IPs by request count (hybrid: rollup + live)
+    /// Get top IPs by request count (hybrid: rollup + live for short ranges)
     pub async fn get_top_ips_by_requests(&self, since_hours: i64, limit: i32) -> Result<Vec<IpStat>> {
         let now = Utc::now();
         let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
@@ -643,16 +652,19 @@ impl Database {
             }
         }
         
-        // Add live data for today
-        let live_rows: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT ip, COUNT(*) as c FROM requests WHERE timestamp > ? GROUP BY ip ORDER BY c DESC LIMIT 200"
-        )
-        .bind(today_start)
-        .fetch_all(&self.pool)
-        .await?;
-        
-        for (ip, count) in live_rows {
-            *ip_counts.entry(ip).or_insert(0) += count;
+        // Only add live data for short time ranges (< 24 hours)
+        // For 30-day/7-day queries, today's partial data is negligible and live query is too slow
+        if since_hours < 24 {
+            let live_rows: Vec<(String, i64)> = sqlx::query_as(
+                "SELECT ip, COUNT(*) as c FROM requests WHERE timestamp > ? GROUP BY ip ORDER BY c DESC LIMIT 100"
+            )
+            .bind(since_ts)
+            .fetch_all(&self.pool)
+            .await?;
+            
+            for (ip, count) in live_rows {
+                *ip_counts.entry(ip).or_insert(0) += count;
+            }
         }
         
         let mut result: Vec<IpStat> = ip_counts.into_iter()
@@ -664,7 +676,7 @@ impl Database {
         Ok(result)
     }
 
-    /// Get top IPs by bandwidth (hybrid: rollup + live)
+    /// Get top IPs by bandwidth (hybrid: rollup + live for short ranges)
     pub async fn get_top_ips_by_bandwidth(&self, since_hours: i64, limit: i32) -> Result<Vec<IpStat>> {
         let now = Utc::now();
         let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
@@ -697,16 +709,18 @@ impl Database {
             }
         }
         
-        // Add live data for today
-        let live_rows: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT ip, COALESCE(SUM(request_size), 0) as bytes FROM requests WHERE timestamp > ? GROUP BY ip ORDER BY bytes DESC LIMIT 200"
-        )
-        .bind(today_start)
-        .fetch_all(&self.pool)
-        .await?;
-        
-        for (ip, bytes) in live_rows {
-            *ip_bytes.entry(ip).or_insert(0) += bytes;
+        // Only add live data for short time ranges (< 24 hours)
+        if since_hours < 24 {
+            let live_rows: Vec<(String, i64)> = sqlx::query_as(
+                "SELECT ip, COALESCE(SUM(request_size), 0) as bytes FROM requests WHERE timestamp > ? GROUP BY ip ORDER BY bytes DESC LIMIT 100"
+            )
+            .bind(since_ts)
+            .fetch_all(&self.pool)
+            .await?;
+            
+            for (ip, bytes) in live_rows {
+                *ip_bytes.entry(ip).or_insert(0) += bytes;
+            }
         }
         
         let mut result: Vec<IpStat> = ip_bytes.into_iter()
@@ -718,7 +732,7 @@ impl Database {
         Ok(result)
     }
 
-    /// Get total bytes for a time range (hybrid: rollup + live)
+    /// Get total bytes for a time range (hybrid: rollup + live for short ranges)
     pub async fn get_total_bytes(&self, since_hours: i64) -> Result<i64> {
         let now = Utc::now();
         let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
@@ -740,14 +754,19 @@ impl Database {
         .await
         .unwrap_or((0,));
         
-        // Add live data for today
-        let (live_bytes,): (i64,) = sqlx::query_as(
-            "SELECT COALESCE(SUM(request_size), 0) FROM requests WHERE timestamp > ?"
-        )
-        .bind(today_start)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap_or((0,));
+        // Only add live data for short time ranges (< 24 hours)
+        let live_bytes = if since_hours < 24 {
+            let (bytes,): (i64,) = sqlx::query_as(
+                "SELECT COALESCE(SUM(request_size), 0) FROM requests WHERE timestamp > ?"
+            )
+            .bind(since_ts)
+            .fetch_one(&self.pool)
+            .await
+            .unwrap_or((0,));
+            bytes
+        } else {
+            0
+        };
         
         Ok(rollup_bytes + live_bytes)
     }
