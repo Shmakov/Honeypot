@@ -181,6 +181,7 @@ class HoneypotDashboard {
         document.getElementById('detailCountry').textContent = `${this.countryToFlag(event.country_code)} ${event.country_code || 'Unknown'}`;
         document.getElementById('detailService').textContent = event.service;
         document.getElementById('detailPort').textContent = event.port || '-';
+        document.getElementById('detailSize').textContent = this.formatBytes(event.request_size || 0);
         document.getElementById('detailTime').textContent = new Date(event.timestamp).toLocaleString();
 
         // Credentials
@@ -344,6 +345,14 @@ class HoneypotDashboard {
 
     escapeHtml(text) {
         return escapeHtml(text);
+    }
+
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 }
 

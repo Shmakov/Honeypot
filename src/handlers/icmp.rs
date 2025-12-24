@@ -14,7 +14,7 @@ use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::icmp::{IcmpPacket, IcmpTypes};
 use pnet::packet::Packet;
 
-use crate::db::{AttackEvent, Database};
+use crate::db::{AttackEvent, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
 
@@ -49,7 +49,7 @@ fn find_capture_interface() -> Option<NetworkInterface> {
 }
 
 /// Start the ICMP handler to capture ping requests
-pub async fn start(event_bus: Arc<EventBus>, db: Arc<Database>, geoip: SharedGeoIp) -> Result<()> {
+pub async fn start(event_bus: Arc<EventBus>, write_tx: WriteSender, geoip: SharedGeoIp) -> Result<()> {
     // Find the best interface for capture
     let interface = match find_capture_interface() {
         Some(iface) => {
@@ -85,7 +85,7 @@ pub async fn start(event_bus: Arc<EventBus>, db: Arc<Database>, geoip: SharedGeo
 
     // Use blocking task for the synchronous pnet receiver
     let event_bus_clone = event_bus.clone();
-    let db_clone = db.clone();
+    let write_tx_clone = write_tx.clone();
     let geoip_clone = geoip.clone();
     
     tokio::task::spawn_blocking(move || {
@@ -116,33 +116,25 @@ pub async fn start(event_bus: Arc<EventBus>, db: Arc<Database>, geoip: SharedGeo
                                 let ip = ipv4.get_source().to_string();
                                 debug!("ICMP Echo Request from {}", ip);
                                 
-                                // Create event
+                                // Create event with packet size
                                 let request = format!("ICMP Echo Request (ping) from {}", ip);
+                                let packet_size = ipv4.packet().len() as u32;
                                 let mut event = AttackEvent::new(
                                     ip.clone(),
                                     "icmp".to_string(),
                                     0, // ICMP doesn't use ports
                                     request,
                                 );
+                                event = event.with_request_size(packet_size);
                                 
                                 // Add GeoIP info
                                 if let Some(loc) = geoip_clone.lookup(&ip) {
                                     event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
                                 }
                                 
-                                // Store and publish
-                                let db = db_clone.clone();
-                                let event_bus = event_bus_clone.clone();
-                                let event_clone = event.clone();
-                                
-                                if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                                    handle.spawn(async move {
-                                        if let Err(e) = db.insert_event(&event_clone).await {
-                                            warn!("Failed to store ICMP event: {}", e);
-                                        }
-                                        event_bus.publish(event_clone);
-                                    });
-                                }
+                                // Send to write buffer (non-blocking) and broadcast
+                                let _ = write_tx_clone.send(event.clone());
+                                event_bus_clone.publish(event);
                             }
                         }
                     }

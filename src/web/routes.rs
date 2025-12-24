@@ -7,11 +7,12 @@ use axum::{
     Json,
 };
 use cached::proc_macro::cached;
+use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::AppState;
-use crate::db::{AttackEvent, CountryStat, CredentialStat, Database, LocationStat, PathStat, ServiceStat};
+use crate::db::{AttackEvent, CountryStat, CredentialStat, Database, IpStat, LocationStat, StatsResponse};
 
 /// API error response
 #[derive(Debug, Serialize)]
@@ -64,33 +65,15 @@ fn validate_hours(hours: i64) -> Result<i64, ApiError> {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct StatsResponse {
-    pub total: i64,
-    pub unique_ips: i64,
-    pub services: Vec<ServiceStat>,
-    pub credentials: Vec<CredentialStat>,
-    pub paths: Vec<PathStat>,
-}
-
-/// Cached stats query - 5 minute TTL
+/// Cached stats query - 5 minute TTL (uses hybrid rollup + live)
 #[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
 async fn get_cached_stats(hours: i64, db: Database) -> StatsResponse {
-    let (total, unique_ips, services, credentials, paths) = tokio::join!(
-        db.get_filtered_count(hours),
-        db.get_unique_ips(hours),
-        db.get_service_stats(hours),
-        db.get_top_credentials(hours, 50),
-        db.get_top_paths(hours, 50)
-    );
-
-    StatsResponse {
-        total: total.unwrap_or(0),
-        unique_ips: unique_ips.unwrap_or(0),
-        services: services.unwrap_or_default(),
-        credentials: credentials.unwrap_or_default(),
-        paths: paths.unwrap_or_default(),
-    }
+    db.get_stats_hybrid(hours).await.unwrap_or_else(|_| StatsResponse {
+        total: 0,
+        services: vec![],
+        credentials: vec![],
+        paths: vec![],
+    })
 }
 
 /// Cached countries query - 5 minute TTL
@@ -109,6 +92,24 @@ async fn get_cached_locations(hours: i64, db: Database) -> Vec<LocationStat> {
 #[cached(time = 60, key = "()", convert = r#"{ () }"#)]
 async fn get_cached_recent_credentials(db: Database) -> Vec<(String, String)> {
     db.get_recent_credentials(10).await.unwrap_or_default()
+}
+
+/// Cached top IPs by request count - 5 minute TTL
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+async fn get_cached_top_ips_requests(hours: i64, db: Database) -> Vec<IpStat> {
+    db.get_top_ips_by_requests(hours, 25).await.unwrap_or_default()
+}
+
+/// Cached top IPs by bandwidth - 5 minute TTL
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+async fn get_cached_top_ips_bandwidth(hours: i64, db: Database) -> Vec<IpStat> {
+    db.get_top_ips_by_bandwidth(hours, 25).await.unwrap_or_default()
+}
+
+/// Cached total bytes - 5 minute TTL
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+async fn get_cached_total_bytes(hours: i64, db: Database) -> i64 {
+    db.get_total_bytes(hours).await.unwrap_or(0)
 }
 
 /// API: Get statistics (cached for 5 minutes)
@@ -163,6 +164,33 @@ pub async fn api_locations(
     Ok(Json(get_cached_locations(hours, state.db.clone()).await))
 }
 
+/// API: Get top IPs by request count (cached for 5 minutes)
+pub async fn api_top_ips_requests(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<Vec<IpStat>>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    Ok(Json(get_cached_top_ips_requests(hours, state.db.clone()).await))
+}
+
+/// API: Get top IPs by bandwidth (cached for 5 minutes)
+pub async fn api_top_ips_bandwidth(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<Vec<IpStat>>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    Ok(Json(get_cached_top_ips_bandwidth(hours, state.db.clone()).await))
+}
+
+/// API: Get total traffic bytes (cached for 5 minutes)
+pub async fn api_total_bytes(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<i64>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    Ok(Json(get_cached_total_bytes(hours, state.db.clone()).await))
+}
+
 /// Warm the cache for the default time range (called on startup)
 pub async fn warm_cache(db: &Database) {
     const DEFAULT_HOURS: i64 = 720; // 30 days - matches stats page default
@@ -178,4 +206,57 @@ pub async fn warm_cache(db: &Database) {
     );
     
     tracing::info!("Cache warmed successfully");
+}
+
+/// Run daily rollup backfill and start background aggregation task
+pub fn start_background_tasks(db: Arc<Database>) {
+    // Backfill any missing days first
+    tokio::spawn({
+        let db = db.clone();
+        async move {
+            tracing::info!("Checking for rollup backfill...");
+            match db.get_days_needing_rollup().await {
+                Ok(days) if days.is_empty() => {
+                    tracing::info!("Rollup is up to date, no backfill needed");
+                }
+                Ok(days) => {
+                    tracing::info!("Backfilling {} days of rollup data...", days.len());
+                    for day in days {
+                        if let Err(e) = db.aggregate_day(day).await {
+                            tracing::warn!("Failed to aggregate day {}: {}", day, e);
+                        }
+                    }
+                    tracing::info!("Rollup backfill complete");
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to check rollup status: {}", e);
+                }
+            }
+        }
+    });
+    
+    // Start periodic aggregation (every 5 minutes, update yesterday if needed)
+    tokio::spawn({
+        let db = db.clone();
+        async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(300));
+            loop {
+                interval.tick().await;
+                
+                // Aggregate yesterday (in case we missed it)
+                let now = chrono::Utc::now();
+                let today = chrono::TimeZone::with_ymd_and_hms(
+                    &chrono::Utc, now.year(), now.month(), now.day(), 0, 0, 0
+                ).unwrap().timestamp_millis();
+                let yesterday = today - 86400 * 1000;
+                
+                // Aggregate yesterday first (should be a no-op if already done)
+                if let Err(e) = db.aggregate_day(yesterday).await {
+                    tracing::debug!("Yesterday aggregation: {}", e);
+                }
+                
+                tracing::debug!("Rollup aggregation tick complete");
+            }
+        }
+    });
 }

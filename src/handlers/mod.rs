@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::config::Config;
-use crate::db::Database;
+use crate::db::{Database, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
 
@@ -50,22 +50,20 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
     (9100, "jetdirect"), (9999, "abyss"), (10000, "webmin"), (10010, "rxapi"),
     (32768, "filenet-tms"), (49152, "unknown"), (49153, "unknown"),
     (49154, "unknown"), (49155, "unknown"), (49156, "unknown"), (49157, "unknown"),
-    // Additional high-value ports
     (2222, "ssh-alt"), (2375, "docker"), (2376, "docker-tls"), (4000, "remoteanything"),
     (4443, "pharos"), (5555, "freeciv"), (6006, "x11"), (7001, "weblogic"),
     (7002, "weblogic"), (8001, "http-alt"), (8082, "http-alt"), (8083, "http-alt"),
     (8084, "http-alt"), (8085, "http-alt"), (8086, "influxdb"), (8087, "http-alt"),
     (8089, "splunk"), (9001, "tor"), (9002, "dynamid"), (9003, "unknown"),
-    // Complete to 128 ports
     (4444, "krb524"), (5222, "xmpp"), (5269, "xmpp-server"), (8088, "radan-http"),
     (8181, "http-alt"), (8880, "cddbp-alt"), (9080, "glrpc"), (9443, "tungsten-https"),
 ];
 
-/// Start all protocol handlers
-pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp) -> Result<()> {
+/// Start all protocol handlers with async write buffer
+pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp, write_tx: WriteSender) -> Result<()> {
     let config = Arc::new(config.clone());
     let event_bus = Arc::new(event_bus);
-    let db = Arc::new(db);
+    let _db = Arc::new(db.clone()); // Keep for future use, handlers use write_tx
 
     // Start TCP listeners for each port (skip 80/443 as those will be web server)
     for (port, service) in TCP_PORTS {
@@ -73,28 +71,28 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip
         let service = service.to_string();
         let config = config.clone();
         let event_bus = event_bus.clone();
-        let db = db.clone();
+        let write_tx = write_tx.clone();
         let geoip = geoip.clone();
 
         tokio::spawn(async move {
             match service.as_str() {
                 "ssh" => {
-                    if let Err(e) = ssh::start(port, config, event_bus, db, geoip).await {
+                    if let Err(e) = ssh::start(port, config, event_bus, write_tx, geoip).await {
                         tracing::debug!("SSH handler on port {} failed: {}", port, e);
                     }
                 }
                 "ftp" => {
-                    if let Err(e) = ftp::start(port, config, event_bus, db, geoip).await {
+                    if let Err(e) = ftp::start(port, config, event_bus, write_tx, geoip).await {
                         tracing::debug!("FTP handler on port {} failed: {}", port, e);
                     }
                 }
                 "telnet" => {
-                    if let Err(e) = telnet::start(port, config, event_bus, db, geoip).await {
+                    if let Err(e) = telnet::start(port, config, event_bus, write_tx, geoip).await {
                         tracing::debug!("Telnet handler on port {} failed: {}", port, e);
                     }
                 }
                 _ => {
-                    if let Err(e) = tcp::start(port, &service, config, event_bus, db, geoip).await {
+                    if let Err(e) = tcp::start(port, &service, config, event_bus, write_tx, geoip).await {
                         tracing::debug!("{} handler on port {} failed: {}", service, port, e);
                     }
                 }
@@ -104,14 +102,14 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip
 
     // ICMP handler (optional, requires CAP_NET_RAW)
     let event_bus_icmp = event_bus.clone();
-    let db_icmp = db.clone();
+    let write_tx_icmp = write_tx.clone();
     let geoip_icmp = geoip.clone();
     tokio::spawn(async move {
-        if let Err(e) = icmp::start(event_bus_icmp, db_icmp, geoip_icmp).await {
+        if let Err(e) = icmp::start(event_bus_icmp, write_tx_icmp, geoip_icmp).await {
             tracing::debug!("ICMP handler failed: {}", e);
         }
     });
 
-    info!("Started {} protocol handlers", TCP_PORTS.len());
+    info!("Started {} protocol handlers with async write buffer", TCP_PORTS.len());
     Ok(())
 }

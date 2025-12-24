@@ -53,17 +53,14 @@ impl GeoIp {
             return None;
         }
         
-        let city: geoip2::City = reader.lookup(ip_addr).ok()?;
+        let city: geoip2::City = reader.lookup(ip_addr).ok()?.decode().ok()??;
         
-        let country_code = city.country
-            .as_ref()
-            .and_then(|c| c.iso_code)
+        let country_code = city.country.iso_code
             .unwrap_or("XX")
             .to_string();
         
-        let location = city.location.as_ref()?;
-        let latitude = location.latitude?;
-        let longitude = location.longitude?;
+        let latitude = city.location.latitude?;
+        let longitude = city.location.longitude?;
         
         Some(GeoLocation {
             country_code,

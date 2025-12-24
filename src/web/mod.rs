@@ -4,7 +4,7 @@ mod middleware;
 mod routes;
 mod sse;
 
-pub use routes::warm_cache;
+pub use routes::{warm_cache, start_background_tasks};
 
 use anyhow::Result;
 use axum::{
@@ -20,7 +20,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::info;
 
 use crate::config::Config;
-use crate::db::Database;
+use crate::db::{Database, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
 
@@ -29,6 +29,7 @@ pub struct AppState {
     pub db: Database,
     pub geoip: SharedGeoIp,
     pub public_url: String,
+    pub write_tx: WriteSender,
 }
 
 /// Format HTTP headers as a readable string
@@ -204,12 +205,13 @@ async fn catch_all(
     (StatusCode::OK, axum::response::Html(html))
 }
 
-pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp) -> Result<()> {
+pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp, write_tx: WriteSender) -> Result<()> {
     let state = Arc::new(AppState {
         event_bus,
         db,
         geoip,
         public_url: config.server.public_url.clone(),
+        write_tx,
     });
 
     let app = Router::new()
@@ -225,6 +227,9 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         .route("/api/recent", get(routes::api_recent))
         .route("/api/countries", get(routes::api_countries))
         .route("/api/locations", get(routes::api_locations))
+        .route("/api/top-ips-requests", get(routes::api_top_ips_requests))
+        .route("/api/top-ips-bandwidth", get(routes::api_top_ips_bandwidth))
+        .route("/api/total-bytes", get(routes::api_total_bytes))
         // Static files
         .route("/static/*path", get(static_files))
         // Catch-all for any other path

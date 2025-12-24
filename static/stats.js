@@ -114,10 +114,13 @@ class StatsPage {
         select.disabled = true;
 
         try {
-            const [statsResponse, countriesResponse, locationsResponse] = await Promise.all([
+            const [statsResponse, countriesResponse, locationsResponse, topIpsRequestsResponse, topIpsBandwidthResponse, totalBytesResponse] = await Promise.all([
                 fetch(`/api/stats?hours=${hours}`),
                 fetch(`/api/countries?hours=${hours}`),
-                fetch(`/api/locations?hours=${hours}`)
+                fetch(`/api/locations?hours=${hours}`),
+                fetch(`/api/top-ips-requests?hours=${hours}`),
+                fetch(`/api/top-ips-bandwidth?hours=${hours}`),
+                fetch(`/api/total-bytes?hours=${hours}`)
             ]);
 
             // Check for API errors (invalid hours returns 400)
@@ -129,14 +132,19 @@ class StatsPage {
             const stats = await statsResponse.json();
             const countries = await countriesResponse.json();
             const locations = await locationsResponse.json();
+            const topIpsRequests = topIpsRequestsResponse.ok ? await topIpsRequestsResponse.json() : [];
+            const topIpsBandwidth = topIpsBandwidthResponse.ok ? await topIpsBandwidthResponse.json() : [];
+            const totalBytes = totalBytesResponse.ok ? await totalBytesResponse.json() : 0;
 
             this.countriesData = countries;
-            this.updateOverview(stats, countries);
+            this.updateOverview(stats, countries, totalBytes);
             this.updateServicesChart(stats.services);
             this.updateCountriesChart(countries);
             this.updateCredentialsTable(stats.credentials);
             this.updatePathsTable(stats.paths);
             this.updateMapMarkers(locations);
+            this.updateTopIpsRequestsTable(topIpsRequests);
+            this.updateTopIpsBandwidthTable(topIpsBandwidth);
 
         } catch (error) {
             console.error('Failed to load stats:', error);
@@ -163,16 +171,22 @@ class StatsPage {
         }
     }
 
-    updateOverview(stats, countries) {
+    updateOverview(stats, countries, totalBytes) {
         document.getElementById('totalRequests').textContent = stats.total.toLocaleString();
+        document.getElementById('totalTraffic').textContent = this.formatBytes(totalBytes);
         document.getElementById('uniqueServices').textContent = stats.services.length;
         document.getElementById('uniqueCountries').textContent = countries.length;
+    }
 
-        // Calculate unique IPs if available
-        const uniqueIpsEl = document.getElementById('uniqueIps');
-        if (uniqueIpsEl) {
-            uniqueIpsEl.textContent = stats.unique_ips ? stats.unique_ips.toLocaleString() : '-';
-        }
+    /**
+     * Format bytes to human-readable string (KB, MB, GB, etc.)
+     */
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
     updateServicesChart(services) {
@@ -362,6 +376,52 @@ class StatsPage {
     // Convert country code to flag emoji - use shared utility
     countryToFlag(code) {
         return countryToFlag(code);
+    }
+
+    updateTopIpsRequestsTable(ips) {
+        const tbody = document.getElementById('topIpsRequestsTable');
+
+        if (!ips || ips.length === 0) {
+            tbody.innerHTML = `<tr>
+                <td colspan="2" class="px-6 py-8 text-center text-gray-500">
+                    <div class="flex flex-col items-center gap-2">
+                        <span class="text-2xl">🔍</span>
+                        <span>No IP data available</span>
+                    </div>
+                </td>
+            </tr>`;
+            return;
+        }
+
+        tbody.innerHTML = ips.map(ip => `
+            <tr class="hover:bg-gray-800/30 transition-colors">
+                <td class="px-6 py-3 font-mono text-sm text-cyan-400">${this.escapeHtml(ip.ip)}</td>
+                <td class="px-6 py-3 text-sm text-gray-400 text-right tabular-nums">${ip.count.toLocaleString()}</td>
+            </tr>
+        `).join('');
+    }
+
+    updateTopIpsBandwidthTable(ips) {
+        const tbody = document.getElementById('topIpsBandwidthTable');
+
+        if (!ips || ips.length === 0) {
+            tbody.innerHTML = `<tr>
+                <td colspan="2" class="px-6 py-8 text-center text-gray-500">
+                    <div class="flex flex-col items-center gap-2">
+                        <span class="text-2xl">📊</span>
+                        <span>No bandwidth data available</span>
+                    </div>
+                </td>
+            </tr>`;
+            return;
+        }
+
+        tbody.innerHTML = ips.map(ip => `
+            <tr class="hover:bg-gray-800/30 transition-colors">
+                <td class="px-6 py-3 font-mono text-sm text-purple-400">${this.escapeHtml(ip.ip)}</td>
+                <td class="px-6 py-3 text-sm text-gray-400 text-right tabular-nums">${this.formatBytes(ip.count)}</td>
+            </tr>
+        `).join('');
     }
 }
 

@@ -7,7 +7,7 @@ use tokio::net::TcpListener;
 use tracing::{info, warn};
 
 use crate::config::Config;
-use crate::db::{AttackEvent, Database};
+use crate::db::{AttackEvent, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
 
@@ -36,7 +36,7 @@ pub async fn start(
     service: &str,
     config: Arc<Config>,
     event_bus: Arc<EventBus>,
-    db: Arc<Database>,
+    write_tx: WriteSender,
     geoip: SharedGeoIp,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
@@ -59,7 +59,7 @@ pub async fn start(
                 let service = service.clone();
                 let banner = banner.clone();
                 let event_bus = event_bus.clone();
-                let db = db.clone();
+                let write_tx = write_tx.clone();
                 let geoip = geoip.clone();
 
                 tokio::spawn(async move {
@@ -88,6 +88,11 @@ pub async fn start(
                         port
                     );
                     let mut event = AttackEvent::new(ip.clone(), service, port, request);
+                    
+                    // Calculate and set request size from payload
+                    let request_size = payload.as_ref().map(|p| p.len() as u32).unwrap_or(0);
+                    event = event.with_request_size(request_size);
+                    
                     if let Some(p) = payload {
                         event = event.with_payload(p);
                     }
@@ -97,10 +102,8 @@ pub async fn start(
                         event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
                     }
 
-                    // Store and broadcast
-                    if let Err(e) = db.insert_event(&event).await {
-                        warn!("Failed to store event: {}", e);
-                    }
+                    // Send to write buffer (non-blocking) and broadcast
+                    let _ = write_tx.send(event.clone());
                     event_bus.publish(event);
                 });
             }

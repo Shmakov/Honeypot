@@ -131,6 +131,7 @@ where
                 let full_uri_clone = full_uri.clone();
                 let headers_clone = headers.clone();
                 let ip_clone = ip.clone();
+                let request_size = calculate_request_size(&headers, &method, &full_uri);
                 
                 tokio::spawn(async move {
                     log_http_event(
@@ -140,6 +141,7 @@ where
                         &method_clone,
                         &full_uri_clone,
                         &headers_clone,
+                        request_size,
                     ).await;
                 });
             }
@@ -161,6 +163,26 @@ fn format_headers(headers: &HeaderMap) -> String {
         .join("\n")
 }
 
+/// Calculate estimated request size from headers and request line
+fn calculate_request_size(headers: &HeaderMap, method: &str, uri: &str) -> u32 {
+    // Request line: "GET /path HTTP/1.1\r\n"
+    let request_line_size = method.len() + 1 + uri.len() + 11; // " HTTP/1.1\r\n"
+    
+    // Headers size
+    let headers_size: usize = headers.iter()
+        .map(|(k, v)| k.as_str().len() + 2 + v.len() + 2) // "Key: Value\r\n"
+        .sum();
+    
+    // Body size from Content-Length
+    let body_size: usize = headers
+        .get("content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    
+    (request_line_size + headers_size + 2 + body_size) as u32  // +2 for \r\n after headers
+}
+
 /// Log an HTTP request as an attack event
 async fn log_http_event(
     state: &AppState,
@@ -169,6 +191,7 @@ async fn log_http_event(
     method: &str,
     uri: &str,
     headers: &HeaderMap,
+    request_size: u32,
 ) {
     // Format request with method, path, and headers
     let headers_str = format_headers(headers);
@@ -193,14 +216,16 @@ async fn log_http_event(
         event = event.with_user_agent(ua);
     }
     
+    // Set request size
+    event = event.with_request_size(request_size);
+    
     // Add GeoIP info
     if let Some(loc) = state.geoip.lookup(&ip) {
         event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
     }
     
-    if let Err(e) = state.db.insert_event(&event).await {
-        tracing::warn!("Failed to store HTTP event: {}", e);
-    }
+    // Send to write buffer (non-blocking) and broadcast
+    let _ = state.write_tx.send(event.clone());
     state.event_bus.publish(event);
     
     tracing::info!("HTTP {} {} from {}", method, uri, ip);

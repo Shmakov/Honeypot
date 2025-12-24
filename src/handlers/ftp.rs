@@ -7,7 +7,7 @@ use tokio::net::TcpListener;
 use tracing::{info, warn};
 
 use crate::config::Config;
-use crate::db::{AttackEvent, Database};
+use crate::db::{AttackEvent, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
 
@@ -15,7 +15,7 @@ pub async fn start(
     port: u16,
     config: Arc<Config>,
     event_bus: Arc<EventBus>,
-    db: Arc<Database>,
+    write_tx: WriteSender,
     geoip: SharedGeoIp,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
@@ -35,12 +35,12 @@ pub async fn start(
             Ok((socket, peer_addr)) => {
                 let ip = peer_addr.ip().to_string();
                 let event_bus = event_bus.clone();
-                let db = db.clone();
+                let write_tx = write_tx.clone();
                 let banner = banner.clone();
                 let geoip = geoip.clone();
 
                 tokio::spawn(async move {
-                    handle_ftp_session(socket, ip, port, banner, event_bus, db, geoip).await;
+                    handle_ftp_session(socket, ip, port, banner, event_bus, write_tx, geoip).await;
                 });
             }
             Err(e) => {
@@ -56,7 +56,7 @@ async fn handle_ftp_session(
     port: u16,
     banner: String,
     event_bus: Arc<EventBus>,
-    db: Arc<Database>,
+    write_tx: WriteSender,
     geoip: SharedGeoIp,
 ) {
     let (reader, mut writer) = socket.into_split();
@@ -141,6 +141,10 @@ async fn handle_ftp_session(
 
     let mut event = AttackEvent::new(ip.clone(), "ftp".to_string(), port, request);
     
+    // Calculate request size from commands
+    let request_size: u32 = commands.iter().map(|c| c.len() as u32 + 2).sum(); // +2 for \r\n
+    event = event.with_request_size(request_size);
+    
     if !username.is_empty() {
         event = event.with_credentials(username, password);
     }
@@ -154,8 +158,7 @@ async fn handle_ftp_session(
         event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
     }
 
-    if let Err(e) = db.insert_event(&event).await {
-        warn!("Failed to store FTP event: {}", e);
-    }
+    // Send to write buffer (non-blocking) and broadcast
+    let _ = write_tx.send(event.clone());
     event_bus.publish(event);
 }

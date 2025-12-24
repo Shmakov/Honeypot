@@ -7,7 +7,7 @@ use tokio::net::TcpListener;
 use tracing::{debug, info, warn};
 
 use crate::config::Config;
-use crate::db::{AttackEvent, Database};
+use crate::db::{AttackEvent, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
 
@@ -24,7 +24,7 @@ pub async fn start(
     port: u16,
     config: Arc<Config>,
     event_bus: Arc<EventBus>,
-    db: Arc<Database>,
+    write_tx: WriteSender,
     geoip: SharedGeoIp,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
@@ -43,11 +43,11 @@ pub async fn start(
             Ok((socket, peer_addr)) => {
                 let ip = peer_addr.ip().to_string();
                 let event_bus = event_bus.clone();
-                let db = db.clone();
+                let write_tx = write_tx.clone();
                 let geoip = geoip.clone();
 
                 tokio::spawn(async move {
-                    handle_telnet_session(socket, ip, port, event_bus, db, geoip).await;
+                    handle_telnet_session(socket, ip, port, event_bus, write_tx, geoip).await;
                 });
             }
             Err(e) => {
@@ -163,7 +163,7 @@ async fn handle_telnet_session(
     ip: String,
     port: u16,
     event_bus: Arc<EventBus>,
-    db: Arc<Database>,
+    write_tx: WriteSender,
     geoip: SharedGeoIp,
 ) {
     debug!("Telnet session started from {}", ip);
@@ -278,6 +278,11 @@ async fn handle_telnet_session(
 
     let mut event = AttackEvent::new(ip.clone(), "telnet".to_string(), port, request);
     
+    // Calculate request size: username + password + commands
+    let request_size: u32 = username.len() as u32 + password.len() as u32 
+        + commands.iter().map(|c| c.len() as u32 + 2).sum::<u32>(); // +2 for \r\n
+    event = event.with_request_size(request_size);
+    
     if !username.is_empty() {
         event = event.with_credentials(username, password);
     }
@@ -291,9 +296,8 @@ async fn handle_telnet_session(
         event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
     }
 
-    if let Err(e) = db.insert_event(&event).await {
-        warn!("Failed to store Telnet event: {}", e);
-    }
+    // Send to write buffer (non-blocking) and broadcast
+    let _ = write_tx.send(event.clone());
     event_bus.publish(event);
     debug!("Telnet session ended from {}", ip);
 }

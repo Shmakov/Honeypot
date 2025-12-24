@@ -53,19 +53,27 @@ async fn main() -> Result<()> {
     let handler_db = db.clone();
     let handler_geoip = geoip.clone();
 
+    // Create write buffer for all event ingestion (shared between handlers and web)
+    let db_arc = Arc::new(db.clone());
+    let write_tx = db::start_write_buffer(db_arc.clone());
+    let handler_write_tx = write_tx.clone();
+
     // Start protocol handlers in background
     tokio::spawn(async move {
-        if let Err(e) = handlers::start_all(&handler_config, handler_event_bus, handler_db, handler_geoip).await {
+        if let Err(e) = handlers::start_all(&handler_config, handler_event_bus, handler_db, handler_geoip, handler_write_tx).await {
             tracing::error!("Failed to start handlers: {}", e);
         }
     });
     info!("Protocol handlers starting...");
 
+    // Start background tasks for rollup aggregation
+    web::start_background_tasks(db_arc);
+
     // Warm the cache for default time ranges
     web::warm_cache(&db).await;
 
-    // Start web server (blocking)
-    web::start_server(&config, event_bus, db, geoip).await?;
+    // Start web server (blocking) - pass write_tx for HTTP event logging
+    web::start_server(&config, event_bus, db, geoip, write_tx).await?;
 
     Ok(())
 }

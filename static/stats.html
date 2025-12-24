@@ -92,7 +92,7 @@
         <main class="max-w-7xl mx-auto px-6 lg:px-8 py-8">
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-5 mb-8">
                 <div
                     class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
                     <div class="flex items-center justify-between mb-3">
@@ -104,10 +104,10 @@
                 <div
                     class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-gray-500 text-sm font-medium">Unique IPs</span>
-                        <span class="text-2xl">🌐</span>
+                        <span class="text-gray-500 text-sm font-medium">Total Traffic</span>
+                        <span class="text-2xl">📊</span>
                     </div>
-                    <div id="uniqueIps" class="text-3xl font-bold text-white">-</div>
+                    <div id="totalTraffic" class="text-3xl font-bold text-white">-</div>
                 </div>
                 <div
                     class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
@@ -200,6 +200,67 @@
                                 </tr>
                             </thead>
                             <tbody id="pathsTable" class="divide-y divide-gray-800/50">
+                                <tr>
+                                    <td colspan="2" class="px-6 py-8 text-center text-gray-500">
+                                        <div class="flex flex-col items-center gap-2">
+                                            <span class="text-2xl">📊</span>
+                                            <span>Loading data...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IP Stats Tables Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <!-- Top IPs by Requests -->
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-800">
+                        <h3 class="text-lg font-semibold text-white">Top IPs by Requests</h3>
+                        <p class="text-sm text-gray-500 mt-1">Most active IP addresses by request count</p>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-80">
+                        <table class="w-full">
+                            <thead class="bg-gray-800/30">
+                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th class="px-6 py-4">IP Address</th>
+                                    <th class="px-6 py-4 text-right">Requests</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topIpsRequestsTable" class="divide-y divide-gray-800/50">
+                                <tr>
+                                    <td colspan="2" class="px-6 py-8 text-center text-gray-500">
+                                        <div class="flex flex-col items-center gap-2">
+                                            <span class="text-2xl">📊</span>
+                                            <span>Loading data...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Top IPs by Bandwidth -->
+                <div
+                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-800">
+                        <h3 class="text-lg font-semibold text-white">Top IPs by Bandwidth</h3>
+                        <p class="text-sm text-gray-500 mt-1">IP addresses with most traffic volume</p>
+                    </div>
+                    <div class="overflow-x-auto overflow-y-auto max-h-80">
+                        <table class="w-full">
+                            <thead class="bg-gray-800/30">
+                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <th class="px-6 py-4">IP Address</th>
+                                    <th class="px-6 py-4 text-right">Bandwidth</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topIpsBandwidthTable" class="divide-y divide-gray-800/50">
                                 <tr>
                                     <td colspan="2" class="px-6 py-8 text-center text-gray-500">
                                         <div class="flex flex-col items-center gap-2">
