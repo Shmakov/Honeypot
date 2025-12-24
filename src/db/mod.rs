@@ -774,9 +774,22 @@ impl Database {
     // ==================== ROLLUP AGGREGATION (called by background task) ====================
 
     /// Aggregate a single day's data into stats_daily
+    /// Skips if already aggregated (check stats_daily first)
     pub async fn aggregate_day(&self, day_bucket: i64) -> Result<()> {
         let day_start = day_bucket;
         let day_end = day_bucket + 86400 * 1000; // +1 day in ms
+        
+        // Check if already aggregated - skip expensive queries if so
+        let (exists,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM stats_daily WHERE day_bucket = ?"
+        )
+        .bind(day_bucket)
+        .fetch_one(&self.pool)
+        .await?;
+        
+        if exists > 0 {
+            return Ok(()); // Already aggregated, nothing to do
+        }
         
         // Get total count and total bytes
         let (total, total_bytes): (i64, i64) = sqlx::query_as(

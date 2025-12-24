@@ -236,27 +236,27 @@ pub fn start_background_tasks(db: Arc<Database>) {
         }
     });
     
-    // Start periodic aggregation (every 5 minutes, update yesterday if needed)
+    // Start periodic rollup check (every hour, aggregate yesterday if not done)
+    // The aggregate_day function checks if already done, so this is cheap
     tokio::spawn({
         let db = db.clone();
         async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(300));
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
             loop {
                 interval.tick().await;
                 
-                // Aggregate yesterday (in case we missed it)
+                // Aggregate yesterday (skips if already done)
                 let now = chrono::Utc::now();
                 let today = chrono::TimeZone::with_ymd_and_hms(
                     &chrono::Utc, now.year(), now.month(), now.day(), 0, 0, 0
                 ).unwrap().timestamp_millis();
                 let yesterday = today - 86400 * 1000;
                 
-                // Aggregate yesterday first (should be a no-op if already done)
                 if let Err(e) = db.aggregate_day(yesterday).await {
-                    tracing::debug!("Yesterday aggregation: {}", e);
+                    tracing::debug!("Hourly rollup check: {}", e);
                 }
                 
-                tracing::debug!("Rollup aggregation tick complete");
+                tracing::debug!("Hourly rollup check complete");
             }
         }
     });
