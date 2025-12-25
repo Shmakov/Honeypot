@@ -605,11 +605,6 @@
     background-color: #edf2f7 !important;
 }
 
-/* Charts legend text */
-[data-theme="light"] .chartjs-legend li {
-    color: #4a5568 !important;
-}
-
 /* Footer */
 [data-theme="light"] footer {
     color: #718096 !important;
@@ -621,6 +616,28 @@
 
 [data-theme="light"] footer a:hover {
     color: #2d3748 !important;
+}
+
+/* ===== LIGHT THEME STAT BARS ===== */
+/* Light mode adjustments for the horizontal bar charts */
+[data-theme="light"] .stat-bar-item .text-gray-200 {
+    color: #1a202c !important;
+}
+
+[data-theme="light"] .stat-bar-item .text-gray-400 {
+    color: #4a5568 !important;
+}
+
+[data-theme="light"] .stat-bar-item .text-gray-500 {
+    color: #718096 !important;
+}
+
+[data-theme="light"] .stat-bar-item .bg-gray-800 {
+    background-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .stat-bar-item:hover>div {
+    background-color: rgba(66, 153, 225, 0.1) !important;
 }
 
 /* ===== LIGHT THEME SERVICE BADGES ===== */

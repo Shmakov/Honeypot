@@ -38,9 +38,6 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body class="bg-gray-950 text-gray-100 font-sans min-h-screen">
@@ -139,15 +136,15 @@
             <!-- Charts Row -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
-                    <h3 class="text-lg font-semibold text-white mb-6">Requests by Service</h3>
-                    <div class="h-72 flex items-center justify-center">
-                        <canvas id="servicesChart"></canvas>
+                    <h3 class="text-lg font-semibold text-white mb-4">Requests by Service</h3>
+                    <div id="servicesChart" class="h-72 overflow-y-auto space-y-1 pr-2">
+                        <div class="text-gray-500 text-center py-8">Loading...</div>
                     </div>
                 </div>
                 <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
-                    <h3 class="text-lg font-semibold text-white mb-6">Top Countries</h3>
-                    <div class="h-72 flex items-center justify-center">
-                        <canvas id="countriesChart"></canvas>
+                    <h3 class="text-lg font-semibold text-white mb-4">Top Countries</h3>
+                    <div id="countriesChart" class="h-72 overflow-y-auto space-y-1 pr-2">
+                        <div class="text-gray-500 text-center py-8">Loading...</div>
                     </div>
                 </div>
             </div>

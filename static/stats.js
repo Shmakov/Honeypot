@@ -12,7 +12,6 @@ let currentTileLayer = null;
 
 class StatsPage {
     constructor() {
-        this.charts = {};
         this.countriesData = [];
         this.loadingOverlay = document.getElementById('loadingOverlay');
         this.init();
@@ -190,91 +189,92 @@ class StatsPage {
     }
 
     updateServicesChart(services) {
-        const ctx = document.getElementById('servicesChart').getContext('2d');
+        const container = document.getElementById('servicesChart');
 
-        if (this.charts.services) {
-            this.charts.services.destroy();
+        if (!services || services.length === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                    <span class="text-2xl mb-2">🛡️</span>
+                    <span>No service data available</span>
+                </div>`;
+            return;
         }
 
-        const colors = [
-            '#ef4444', '#f59e0b', '#8b5cf6', '#3b82f6', '#06b6d4',
-            '#10b981', '#84cc16', '#ec4899', '#6366f1', '#14b8a6'
-        ];
+        // Sort by count descending to show top services first
+        const sortedServices = [...services].sort((a, b) => b.count - a.count);
+        const maxCount = Math.max(...sortedServices.map(s => s.count));
 
-        this.charts.services = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: services.map(s => s.service),
-                datasets: [{
-                    data: services.map(s => s.count),
-                    backgroundColor: services.map((_, i) => colors[i % colors.length]),
-                    borderWidth: 0,
-                    spacing: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '60%',
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            color: '#9ca3af',
-                            font: { size: 12, family: 'Inter' },
-                            padding: 16,
-                            usePointStyle: true,
-                            pointStyle: 'circle'
-                        }
-                    }
-                }
-            }
-        });
+        container.innerHTML = sortedServices.map((s, i) => {
+            const percentage = (s.count / maxCount) * 100;
+            const opacity = Math.max(0.4, 1 - (i * 0.03)); // Fade out slightly for lower ranks
+
+            return `
+                <div class="stat-bar-item group">
+                    <div class="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                        <span class="text-gray-500 text-xs font-medium w-5 text-right">${i + 1}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-medium text-gray-200 truncate">${this.escapeHtml(s.service)}</span>
+                                <span class="text-xs text-gray-400 tabular-nums ml-2">${s.count.toLocaleString()}</span>
+                            </div>
+                            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-300" 
+                                     style="width: ${percentage}%; background: linear-gradient(90deg, rgba(245, 158, 11, ${opacity}), rgba(249, 115, 22, ${opacity}));"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
     }
 
     updateCountriesChart(countries) {
-        const ctx = document.getElementById('countriesChart').getContext('2d');
+        const container = document.getElementById('countriesChart');
 
-        if (this.charts.countries) {
-            this.charts.countries.destroy();
+        if (!countries || countries.length === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                    <span class="text-2xl mb-2">🌎</span>
+                    <span>No country data available</span>
+                </div>`;
+            return;
         }
 
-        const topCountries = countries.slice(0, 8);
+        const maxCount = Math.max(...countries.map(c => c.count));
 
-        this.charts.countries = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: topCountries.map(c => `${this.countryToFlag(c.country_code)} ${c.country_code || 'Unknown'}`),
-                datasets: [{
-                    label: 'Requests',
-                    data: topCountries.map(c => c.count),
-                    backgroundColor: topCountries.map((_, i) => {
-                        const opacity = 1 - (i * 0.08);
-                        return `rgba(59, 130, 246, ${opacity})`;
-                    }),
-                    borderRadius: 6,
-                    borderSkipped: false
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                plugins: {
-                    legend: { display: false }
-                },
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(255,255,255,0.05)' },
-                        ticks: { color: '#9ca3af', font: { family: 'Inter' } }
-                    },
-                    y: {
-                        grid: { display: false },
-                        ticks: { color: '#9ca3af', font: { family: 'Inter', weight: '500' } }
-                    }
+        // Use Intl.DisplayNames to get full country names
+        const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+
+        container.innerHTML = countries.map((c, i) => {
+            const percentage = (c.count / maxCount) * 100;
+            const opacity = Math.max(0.4, 1 - (i * 0.02)); // Fade out slightly for lower ranks
+            const flag = this.countryToFlag(c.country_code);
+            // Get full country name, fallback to code if not found
+            let name = 'Unknown';
+            if (c.country_code) {
+                try {
+                    name = regionNames.of(c.country_code) || c.country_code;
+                } catch {
+                    name = c.country_code;
                 }
             }
-        });
+
+            return `
+                <div class="stat-bar-item group">
+                    <div class="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-gray-800/50 transition-colors">
+                        <span class="text-gray-500 text-xs font-medium w-5 text-right">${i + 1}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm font-medium text-gray-200 truncate">${flag} ${name}</span>
+                                <span class="text-xs text-gray-400 tabular-nums ml-2">${c.count.toLocaleString()}</span>
+                            </div>
+                            <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-300" 
+                                     style="width: ${percentage}%; background: linear-gradient(90deg, rgba(59, 130, 246, ${opacity}), rgba(99, 102, 241, ${opacity}));"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
     }
 
     /**
