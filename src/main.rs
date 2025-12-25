@@ -20,11 +20,15 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load .env file if present (before any other initialization)
+    let _ = dotenvy::dotenv();
+
     // Initialize logging based on LOG_FORMAT env var
     // Use LOG_FORMAT=gcp for structured GCP Cloud Logging
     let log_format = std::env::var("LOG_FORMAT").unwrap_or_default();
     if log_format == "gcp" {
         tracing_subscriber::registry()
+            .with(tracing_subscriber::filter::LevelFilter::INFO)
             .with(tracing_stackdriver::layer())
             .init();
     } else {

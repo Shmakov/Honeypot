@@ -57,6 +57,7 @@ russh-keys = "0.46"
 rand = "0.8"
 html-escape = "0.2.13"
 tracing-stackdriver = "0.10.0"
+dotenvy = "0.15.7"
 
 [profile.release]
 lto = true
