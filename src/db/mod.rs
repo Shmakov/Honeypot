@@ -289,13 +289,21 @@ impl Database {
 
     /// Get stats using hybrid approach: rollup for complete days, live query for today (only for <24h range)
     /// 
+    /// Special case: hours=24 returns yesterday's rollup only (fast, complete data)
     /// Note: First partial day is excluded from rollup (slight under-count is acceptable)
     pub async fn get_stats_hybrid(&self, since_hours: i64) -> Result<StatsResponse> {
         let now = Utc::now();
-        let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
         let today_start = Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
             .unwrap()
             .timestamp_millis();
+        let yesterday_start = today_start - 86400 * 1000;
+        
+        // Special case: 24h = yesterday only (from rollup, fast)
+        if since_hours == 24 {
+            return self.get_rollup_stats(yesterday_start, today_start).await;
+        }
+        
+        let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
         
         // Start rollup from the day AFTER since_ts to avoid partial day over-count
         let since_day_bucket = ts_to_day_bucket(since_ts);
@@ -308,21 +316,7 @@ impl Database {
             StatsResponse { total: 0, services: vec![], credentials: vec![], paths: vec![] }
         };
         
-        // Only add live data for short time ranges (< 24 hours)
-        // For 30-day/7-day queries, today's partial data is negligible and live query is too slow
-        if since_hours < 24 {
-            let live = self.get_live_stats(since_ts).await?;
-            
-            // Merge results
-            Ok(StatsResponse {
-                total: rollup.total + live.total,
-                services: merge_service_stats(rollup.services, live.services),
-                credentials: merge_credential_stats(rollup.credentials, live.credentials),
-                paths: merge_path_stats(rollup.paths, live.paths),
-            })
-        } else {
-            Ok(rollup)
-        }
+        Ok(rollup)
     }
 
     /// Get stats from rollup table for complete days
@@ -493,21 +487,26 @@ impl Database {
 
     pub async fn get_country_stats(&self, since_hours: i64) -> Result<Vec<CountryStat>> {
         let now = Utc::now();
-        let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
         let today_start = Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
             .unwrap()
             .timestamp_millis();
+        let yesterday_start = today_start - 86400 * 1000;
         
-        // Get from rollup - start from day AFTER since_ts to avoid partial day over-count
-        let since_day_bucket = ts_to_day_bucket(since_ts);
-        let first_complete_day = since_day_bucket + 86400 * 1000; // Next day midnight
-        let before_day = ts_to_day_bucket(today_start);
+        // Special case: 24h = yesterday only (from rollup, fast)
+        let (query_start, query_end) = if since_hours == 24 {
+            (yesterday_start, today_start)
+        } else {
+            let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
+            let since_day_bucket = ts_to_day_bucket(since_ts);
+            let first_complete_day = since_day_bucket + 86400 * 1000;
+            (first_complete_day, ts_to_day_bucket(today_start))
+        };
         
         let rollup_rows: Vec<(Option<String>,)> = sqlx::query_as(
             "SELECT country_counts FROM stats_daily WHERE day_bucket >= ? AND day_bucket < ?"
         )
-        .bind(first_complete_day)
-        .bind(before_day)
+        .bind(query_start)
+        .bind(query_end)
         .fetch_all(&self.pool)
         .await?;
         
@@ -523,26 +522,7 @@ impl Database {
                 }
             }
         }
-        
-        // Only add live data for short time ranges (< 24 hours)
-        if since_hours < 24 {
-            let live_rows: Vec<(String, i64)> = sqlx::query_as(
-                r#"
-                SELECT country_code, COUNT(*) as count 
-                FROM requests 
-                WHERE timestamp > ? AND country_code IS NOT NULL 
-                GROUP BY country_code
-                "#
-            )
-            .bind(since_ts)
-            .fetch_all(&self.pool)
-            .await?;
-            
-            for (code, count) in live_rows {
-                *countries.entry(code).or_insert(0) += count;
-            }
-        }
-        
+
         let mut result: Vec<CountryStat> = countries.into_iter()
             .map(|(country_code, count)| CountryStat { country_code, count })
             .collect();
@@ -553,21 +533,26 @@ impl Database {
 
     pub async fn get_location_stats(&self, since_hours: i64, limit: i32) -> Result<Vec<LocationStat>> {
         let now = Utc::now();
-        let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
         let today_start = Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
             .unwrap()
             .timestamp_millis();
+        let yesterday_start = today_start - 86400 * 1000;
         
-        // Get from rollup - start from day AFTER since_ts to avoid partial day over-count
-        let since_day_bucket = ts_to_day_bucket(since_ts);
-        let first_complete_day = since_day_bucket + 86400 * 1000; // Next day midnight
-        let before_day = ts_to_day_bucket(today_start);
+        // Special case: 24h = yesterday only (from rollup, fast)
+        let (query_start, query_end) = if since_hours == 24 {
+            (yesterday_start, today_start)
+        } else {
+            let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
+            let since_day_bucket = ts_to_day_bucket(since_ts);
+            let first_complete_day = since_day_bucket + 86400 * 1000;
+            (first_complete_day, ts_to_day_bucket(today_start))
+        };
         
         let rollup_rows: Vec<(Option<String>,)> = sqlx::query_as(
             "SELECT location_counts FROM stats_daily WHERE day_bucket >= ? AND day_bucket < ?"
         )
-        .bind(first_complete_day)
-        .bind(before_day)
+        .bind(query_start)
+        .bind(query_end)
         .fetch_all(&self.pool)
         .await?;
         
@@ -583,27 +568,7 @@ impl Database {
                 }
             }
         }
-        
-        // Only add live data for short time ranges (< 24 hours)
-        if since_hours < 24 {
-            let live_rows: Vec<(f64, f64, i64)> = sqlx::query_as(
-                r#"
-                SELECT ROUND(latitude, 1) as lat, ROUND(longitude, 1) as lon, COUNT(*) as count 
-                FROM requests 
-                WHERE timestamp > ? AND latitude IS NOT NULL AND longitude IS NOT NULL 
-                GROUP BY ROUND(latitude, 1), ROUND(longitude, 1)
-                "#
-            )
-            .bind(since_ts)
-            .fetch_all(&self.pool)
-            .await?;
-            
-            for (lat, lon, count) in live_rows {
-                let key = ((lat * 10.0) as i64, (lon * 10.0) as i64);
-                *locations.entry(key).or_insert(0) += count;
-            }
-        }
-        
+
         let mut result: Vec<LocationStat> = locations.into_iter()
             .map(|((lat_key, lon_key), count)| LocationStat {
                 lat: lat_key as f64 / 10.0,
@@ -619,24 +584,29 @@ impl Database {
 
     // ==================== IP STATS ====================
 
-    /// Get top IPs by request count (hybrid: rollup + live for short ranges)
+    /// Get top IPs by request count (rollup only)
     pub async fn get_top_ips_by_requests(&self, since_hours: i64, limit: i32) -> Result<Vec<IpStat>> {
         let now = Utc::now();
-        let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
         let today_start = Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
             .unwrap()
             .timestamp_millis();
+        let yesterday_start = today_start - 86400 * 1000;
         
-        // Get from rollup
-        let since_day_bucket = ts_to_day_bucket(since_ts);
-        let first_complete_day = since_day_bucket + 86400 * 1000;
-        let before_day = ts_to_day_bucket(today_start);
+        // Special case: 24h = yesterday only (from rollup, fast)
+        let (query_start, query_end) = if since_hours == 24 {
+            (yesterday_start, today_start)
+        } else {
+            let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
+            let since_day_bucket = ts_to_day_bucket(since_ts);
+            let first_complete_day = since_day_bucket + 86400 * 1000;
+            (first_complete_day, ts_to_day_bucket(today_start))
+        };
         
         let rollup_rows: Vec<(Option<String>,)> = sqlx::query_as(
             "SELECT ip_request_counts FROM stats_daily WHERE day_bucket >= ? AND day_bucket < ?"
         )
-        .bind(first_complete_day)
-        .bind(before_day)
+        .bind(query_start)
+        .bind(query_end)
         .fetch_all(&self.pool)
         .await?;
         
@@ -652,21 +622,6 @@ impl Database {
             }
         }
         
-        // Only add live data for short time ranges (< 24 hours)
-        // For 30-day/7-day queries, today's partial data is negligible and live query is too slow
-        if since_hours < 24 {
-            let live_rows: Vec<(String, i64)> = sqlx::query_as(
-                "SELECT ip, COUNT(*) as c FROM requests WHERE timestamp > ? GROUP BY ip ORDER BY c DESC LIMIT 100"
-            )
-            .bind(since_ts)
-            .fetch_all(&self.pool)
-            .await?;
-            
-            for (ip, count) in live_rows {
-                *ip_counts.entry(ip).or_insert(0) += count;
-            }
-        }
-        
         let mut result: Vec<IpStat> = ip_counts.into_iter()
             .map(|(ip, count)| IpStat { ip, count })
             .collect();
@@ -676,24 +631,29 @@ impl Database {
         Ok(result)
     }
 
-    /// Get top IPs by bandwidth (hybrid: rollup + live for short ranges)
+    /// Get top IPs by bandwidth (rollup only)
     pub async fn get_top_ips_by_bandwidth(&self, since_hours: i64, limit: i32) -> Result<Vec<IpStat>> {
         let now = Utc::now();
-        let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
         let today_start = Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
             .unwrap()
             .timestamp_millis();
+        let yesterday_start = today_start - 86400 * 1000;
         
-        // Get from rollup
-        let since_day_bucket = ts_to_day_bucket(since_ts);
-        let first_complete_day = since_day_bucket + 86400 * 1000;
-        let before_day = ts_to_day_bucket(today_start);
+        // Special case: 24h = yesterday only (from rollup, fast)
+        let (query_start, query_end) = if since_hours == 24 {
+            (yesterday_start, today_start)
+        } else {
+            let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
+            let since_day_bucket = ts_to_day_bucket(since_ts);
+            let first_complete_day = since_day_bucket + 86400 * 1000;
+            (first_complete_day, ts_to_day_bucket(today_start))
+        };
         
         let rollup_rows: Vec<(Option<String>,)> = sqlx::query_as(
             "SELECT ip_bytes_counts FROM stats_daily WHERE day_bucket >= ? AND day_bucket < ?"
         )
-        .bind(first_complete_day)
-        .bind(before_day)
+        .bind(query_start)
+        .bind(query_end)
         .fetch_all(&self.pool)
         .await?;
         
@@ -709,20 +669,6 @@ impl Database {
             }
         }
         
-        // Only add live data for short time ranges (< 24 hours)
-        if since_hours < 24 {
-            let live_rows: Vec<(String, i64)> = sqlx::query_as(
-                "SELECT ip, COALESCE(SUM(request_size), 0) as bytes FROM requests WHERE timestamp > ? GROUP BY ip ORDER BY bytes DESC LIMIT 100"
-            )
-            .bind(since_ts)
-            .fetch_all(&self.pool)
-            .await?;
-            
-            for (ip, bytes) in live_rows {
-                *ip_bytes.entry(ip).or_insert(0) += bytes;
-            }
-        }
-        
         let mut result: Vec<IpStat> = ip_bytes.into_iter()
             .map(|(ip, count)| IpStat { ip, count })
             .collect();
@@ -732,43 +678,34 @@ impl Database {
         Ok(result)
     }
 
-    /// Get total bytes for a time range (hybrid: rollup + live for short ranges)
+    /// Get total bytes for a time range (rollup only)
     pub async fn get_total_bytes(&self, since_hours: i64) -> Result<i64> {
         let now = Utc::now();
-        let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
         let today_start = Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
             .unwrap()
             .timestamp_millis();
+        let yesterday_start = today_start - 86400 * 1000;
         
-        // Get from rollup
-        let since_day_bucket = ts_to_day_bucket(since_ts);
-        let first_complete_day = since_day_bucket + 86400 * 1000;
-        let before_day = ts_to_day_bucket(today_start);
+        // Special case: 24h = yesterday only (from rollup, fast)
+        let (query_start, query_end) = if since_hours == 24 {
+            (yesterday_start, today_start)
+        } else {
+            let since_ts = now.timestamp_millis() - (since_hours * 3600 * 1000);
+            let since_day_bucket = ts_to_day_bucket(since_ts);
+            let first_complete_day = since_day_bucket + 86400 * 1000;
+            (first_complete_day, ts_to_day_bucket(today_start))
+        };
         
         let (rollup_bytes,): (i64,) = sqlx::query_as(
             "SELECT COALESCE(SUM(total_bytes), 0) FROM stats_daily WHERE day_bucket >= ? AND day_bucket < ?"
         )
-        .bind(first_complete_day)
-        .bind(before_day)
+        .bind(query_start)
+        .bind(query_end)
         .fetch_one(&self.pool)
         .await
         .unwrap_or((0,));
         
-        // Only add live data for short time ranges (< 24 hours)
-        let live_bytes = if since_hours < 24 {
-            let (bytes,): (i64,) = sqlx::query_as(
-                "SELECT COALESCE(SUM(request_size), 0) FROM requests WHERE timestamp > ?"
-            )
-            .bind(since_ts)
-            .fetch_one(&self.pool)
-            .await
-            .unwrap_or((0,));
-            bytes
-        } else {
-            0
-        };
-        
-        Ok(rollup_bytes + live_bytes)
+        Ok(rollup_bytes)
     }
 
     // ==================== ROLLUP AGGREGATION (called by background task) ====================

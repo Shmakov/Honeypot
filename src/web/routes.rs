@@ -52,8 +52,8 @@ fn default_hours() -> i64 {
 }
 
 /// Allowed time ranges (in hours) - matches frontend dropdown options
-/// Note: 24h disabled - requires live query optimization first
-pub const ALLOWED_HOURS: [i64; 3] = [168, 720, 8760];
+/// 24h = yesterday rollup data
+pub const ALLOWED_HOURS: [i64; 4] = [24, 168, 720, 8760];
 
 /// Validate hours parameter - returns Ok(hours) or Err with API error
 fn validate_hours(hours: i64) -> Result<i64, ApiError> {
