@@ -20,7 +20,7 @@ Check out the **[Live Demo](https://echo.shmakov.net/)**.
 
 - **Real-time Dashboard** - Live attack feed with SSE streaming
 - **Protocol Emulation** - SSH, FTP, Telnet banners and basic responses
-- **120+ Port Monitoring** - Listens on common attack targets
+- **1024+ Port Monitoring** - Listens on common attack targets
 - **GeoIP Integration** - Attack origin mapping with MaxMind
 - **Credential Capture** - Logs SSH/FTP/Telnet login attempts
 - **Statistics Page** - Charts and tables for attack analysis

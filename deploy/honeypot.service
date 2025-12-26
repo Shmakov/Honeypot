@@ -9,7 +9,8 @@ WorkingDirectory=/opt/honeypot
 ExecStart=/opt/honeypot/honeypot
 Restart=always
 RestartSec=5
-
+# Increase resource limits (port listeners plus connections)
+LimitNOFILE=65535
 # Load environment variables from file
 EnvironmentFile=/opt/honeypot/.env
 

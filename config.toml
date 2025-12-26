@@ -9,6 +9,8 @@ public_url = "http://localhost"
 # TLS (optional - set cert paths to enable)
 tls_cert = ""
 tls_key = ""
+# Max ports to listen on (default: 128 for debug, 0=all for release)
+# max_ports = 128
 
 # Database
 [database]

@@ -45,7 +45,7 @@
     <div id="app" class="min-h-screen">
 
         <!-- Header -->
-        <header class="sticky top-0 z-[9999] backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
+        <header class="sticky top-0 z-[9999] bg-gray-900 border-b border-gray-800">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-wrap items-center justify-between gap-y-3 py-3 sm:py-0 sm:h-16">
                     <!-- Row 1 on mobile: Logo + Theme Toggle -->
@@ -139,7 +139,7 @@
 
         <!-- Payload Modal -->
         <div id="modalOverlay"
-            class="modal-overlay fixed inset-0 bg-black/70 backdrop-blur-md z-[99999] flex items-center justify-center opacity-0 invisible transition-all duration-300">
+            class="modal-overlay fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center opacity-0 invisible transition-all duration-300 will-change-[opacity,visibility] transform-gpu">
             <div
                 class="modal bg-gradient-to-b from-gray-900 to-gray-950 border border-gray-700/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden m-4 transform scale-95 transition-transform duration-300 shadow-2xl">
 

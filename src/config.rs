@@ -22,6 +22,9 @@ pub struct ServerConfig {
     /// Public URL for redirects (e.g., "https://honeypot.example.com")
     #[serde(default)]
     pub public_url: String,
+    /// Max ports to listen on (default: 128 for debug, all for release)
+    #[serde(default = "default_max_ports")]
+    pub max_ports: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -36,6 +39,14 @@ pub struct DatabaseConfig {
 
 fn default_cache_size_mb() -> u32 {
     16
+}
+
+fn default_max_ports() -> usize {
+    if cfg!(debug_assertions) {
+        128 // Limit for local development
+    } else {
+        0 // 0 means all ports in release
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
