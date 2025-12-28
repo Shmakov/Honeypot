@@ -73,24 +73,24 @@
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
                     <div id="totalRequests" class="text-3xl font-bold text-white">-</div>
                     <div class="text-sm text-gray-500 mt-1">Total Requests</div>
+                    <div class="mt-3 pt-3 border-t border-gray-800">
+                        <span id="sessionRequests" class="text-lg font-semibold text-cyan-400">0</span>
+                        <span class="text-sm text-gray-500 ml-1">this session</span>
+                    </div>
                 </div>
                 <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <div id="sessionRequests" class="text-3xl font-bold text-white">0</div>
-                    <div class="text-sm text-gray-500 mt-1">This Session</div>
-                </div>
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <div class="text-sm text-gray-500 mb-2">🔐 Recent Credentials</div>
-                    <div id="recentCredentials" class="space-y-1 font-mono text-sm max-h-24 overflow-y-auto">
+                    <div class="text-gray-500 text-sm font-medium mb-2">🔐 Recent Credentials</div>
+                    <div id="recentCredentials" class="space-y-1 font-mono text-sm max-h-40 overflow-y-auto">
                         <div class="text-gray-600">-</div>
                     </div>
                 </div>
                 <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <div class="text-sm text-gray-500 mb-2">💻 Recent Commands</div>
-                    <div id="recentCommands" class="space-y-1 font-mono text-sm max-h-24 overflow-y-auto">
+                    <div class="text-gray-500 text-sm font-medium mb-2">💻 Recent Commands</div>
+                    <div id="recentCommands" class="space-y-1 font-mono text-sm max-h-40 overflow-y-auto">
                         <div class="text-gray-600">-</div>
                     </div>
                 </div>

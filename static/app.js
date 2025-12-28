@@ -279,11 +279,7 @@ class HoneypotDashboard {
         item.textContent = `${username}:${password}`;
 
         this.recentCredentials.insertBefore(item, this.recentCredentials.firstChild);
-
-        // Keep only 6
-        while (this.recentCredentials.children.length > 6) {
-            this.recentCredentials.removeChild(this.recentCredentials.lastChild);
-        }
+        // No limit - let items accumulate with scroll
     }
 
     updateCommandsList(commands) {
@@ -304,11 +300,7 @@ class HoneypotDashboard {
         item.textContent = `$ ${command}`;
 
         this.recentCommands.insertBefore(item, this.recentCommands.firstChild);
-
-        // Keep only 6
-        while (this.recentCommands.children.length > 6) {
-            this.recentCommands.removeChild(this.recentCommands.lastChild);
-        }
+        // No limit - let items accumulate with scroll
     }
 
     updateConnectionStatus(status) {
