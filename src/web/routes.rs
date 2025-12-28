@@ -95,6 +95,12 @@ async fn get_cached_recent_credentials(db: Database) -> Vec<(String, String)> {
     db.get_recent_credentials(10).await.unwrap_or_default()
 }
 
+/// Cached recent commands - 60 second TTL
+#[cached(time = 60, key = "()", convert = r#"{ () }"#)]
+async fn get_cached_recent_commands(db: Database) -> Vec<String> {
+    db.get_recent_commands(10).await.unwrap_or_default()
+}
+
 /// Cached top IPs by request count - 5 minute TTL
 #[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
 async fn get_cached_top_ips_requests(hours: i64, db: Database) -> Vec<IpStat> {
@@ -126,13 +132,15 @@ pub async fn api_stats(
 pub struct RecentResponse {
     pub total: i64,
     pub credentials: Vec<CredentialStat>,
+    pub commands: Vec<String>,
     pub events: Vec<AttackEvent>,
 }
 
-/// API: Get recent data for dashboard (credentials cached 60s, events fresh)
+/// API: Get recent data for dashboard (credentials/commands cached 60s, events fresh)
 pub async fn api_recent(State(state): State<Arc<AppState>>) -> Json<RecentResponse> {
     let total = state.db.get_total_count().await.unwrap_or(0);
     let creds = get_cached_recent_credentials(state.db.clone()).await;
+    let commands = get_cached_recent_commands(state.db.clone()).await;
     let events = state.db.get_recent_events(25).await.unwrap_or_default();
     
     let credentials: Vec<CredentialStat> = creds
@@ -144,8 +152,9 @@ pub async fn api_recent(State(state): State<Arc<AppState>>) -> Json<RecentRespon
         })
         .collect();
 
-    Json(RecentResponse { total, credentials, events })
+    Json(RecentResponse { total, credentials, commands, events })
 }
+
 
 /// API: Get country statistics (cached for 5 minutes)
 pub async fn api_countries(

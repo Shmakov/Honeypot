@@ -22,7 +22,7 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
     // Core services
     (1, "tcpmux"), (7, "echo"), (9, "discard"), (11, "systat"), (13, "daytime"),
     (15, "netstat"), (17, "qotd"), (19, "chargen"), (20, "ftp-data"), (21, "ftp"),
-    (22, "ssh"), (23, "telnet"), (25, "smtp"), (26, "rsftp"), (37, "time"),
+    (22, "ssh"), (2222, "ssh-alt"), (23, "telnet"), (25, "smtp"), (26, "rsftp"), (37, "time"),
     (42, "nameserver"), (43, "whois"), (49, "tacacs"), (53, "dns"),
     // Mail & messaging
     (57, "priv-term"), (66, "sqlnet"), (67, "dhcps"), (68, "dhcpc"), (69, "tftp"),
@@ -129,7 +129,7 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
     (2126, "pktcable-cops"), (2135, "gris"), (2144, "lv-ffx"),
     (2160, "apc-2160"), (2161, "apc-2161"), (2170, "eyetv"),
     (2181, "zookeeper"), (2182, "cgn-stat"), (2190, "tivoconnect"),
-    (2191, "tvbus"), (2196, "unknown"), (2200, "ici"), (2222, "ssh-alt"),
+    (2191, "tvbus"), (2196, "unknown"), (2200, "ici"),
     (2223, "rockwell-csp2"), (2232, "ivs-video"), (2241, "ivsd"),
     (2260, "apc-2260"), (2288, "netml"), (2301, "cpq-wbem"),
     (2323, "3d-nfsd"), (2366, "qip-login"), (2375, "docker"),
@@ -385,7 +385,7 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip
 
         tokio::spawn(async move {
             match service.as_str() {
-                "ssh" => {
+                "ssh" | "ssh-alt" => {
                     if let Err(e) = ssh::start(port, config, event_bus, write_tx, geoip).await {
                         tracing::debug!("SSH handler on port {} failed: {}", port, e);
                     }

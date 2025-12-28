@@ -251,6 +251,44 @@ impl Database {
         Ok(rows)
     }
 
+    /// Get recent commands from SSH/telnet sessions (stored in payload as hex-encoded text)
+    pub async fn get_recent_commands(&self, limit: i32) -> Result<Vec<String>> {
+        // Query for recent ssh/telnet events with payload (contains commands)
+        // SSH stores "SSH shell commands from..." in request field
+        let rows: Vec<(String,)> = sqlx::query_as(
+            r#"
+            SELECT payload FROM requests 
+            WHERE payload IS NOT NULL 
+            AND (service = 'ssh' OR service = 'telnet')
+            ORDER BY id DESC 
+            LIMIT ?
+            "#
+        )
+        .bind(limit * 5) // Fetch more rows since we'll extract multiple commands per row
+        .fetch_all(&self.pool)
+        .await?;
+        
+        let mut commands = Vec::new();
+        for (hex_payload,) in rows {
+            // Decode hex payload to string
+            if let Ok(bytes) = hex::decode(&hex_payload) {
+                if let Ok(text) = String::from_utf8(bytes) {
+                    // Split by newlines and add individual commands
+                    for line in text.lines() {
+                        let cmd = line.trim();
+                        if !cmd.is_empty() && commands.len() < limit as usize {
+                            commands.push(cmd.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Limit total commands
+        commands.truncate(limit as usize);
+        Ok(commands)
+    }
+
     pub async fn get_recent_events(&self, limit: i32) -> Result<Vec<AttackEvent>> {
         let rows: Vec<(i64, i64, String, Option<String>, Option<f64>, Option<f64>, String, i32, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, i32)> = sqlx::query_as(
             r#"

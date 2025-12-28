@@ -27,6 +27,7 @@ class HoneypotDashboard {
         this.totalRequests = document.getElementById('totalRequests');
         this.sessionRequests = document.getElementById('sessionRequests');
         this.recentCredentials = document.getElementById('recentCredentials');
+        this.recentCommands = document.getElementById('recentCommands');
         this.connectionStatus = document.getElementById('connectionStatus');
         this.modalOverlay = document.getElementById('modalOverlay');
         this.mapOverlay = document.getElementById('mapOverlay');
@@ -40,8 +41,9 @@ class HoneypotDashboard {
             this.totalCount = data.total;
             this.totalRequests.textContent = this.formatNumber(this.totalCount);
 
-            // Show recent credentials
+            // Show recent credentials and commands
             this.updateCredentialsList(data.credentials);
+            this.updateCommandsList(data.commands);
 
             // Populate table with recent events (oldest first so newest ends up on top)
             if (data.events && data.events.length > 0) {
@@ -108,6 +110,19 @@ class HoneypotDashboard {
         // Update credentials if present
         if (event.username) {
             this.addCredential(event.username, event.password || '');
+        }
+
+        // Update commands if SSH/telnet event with payload
+        if ((event.service === 'ssh' || event.service === 'telnet') && event.payload) {
+            try {
+                const decoded = this.hexDecode(event.payload);
+                const commands = decoded.split('\n').filter(cmd => cmd.trim());
+                for (const cmd of commands.slice(0, 3)) { // Add up to 3 commands per event
+                    this.addCommand(cmd.trim());
+                }
+            } catch (e) {
+                // Ignore decode errors
+            }
         }
 
         // Show on map (if GeoIP data available)
@@ -268,6 +283,31 @@ class HoneypotDashboard {
         // Keep only 6
         while (this.recentCredentials.children.length > 6) {
             this.recentCredentials.removeChild(this.recentCredentials.lastChild);
+        }
+    }
+
+    updateCommandsList(commands) {
+        if (!commands || commands.length === 0) {
+            this.recentCommands.innerHTML = '<div class="command-item text-gray-600">No commands yet</div>';
+            return;
+        }
+
+        this.recentCommands.innerHTML = commands
+            .slice(0, 6)
+            .map(c => `<div class="command-item text-cyan-400">$ ${this.escapeHtml(c)}</div>`)
+            .join('');
+    }
+
+    addCommand(command) {
+        const item = document.createElement('div');
+        item.className = 'command-item text-cyan-400';
+        item.textContent = `$ ${command}`;
+
+        this.recentCommands.insertBefore(item, this.recentCommands.firstChild);
+
+        // Keep only 6
+        while (this.recentCommands.children.length > 6) {
+            this.recentCommands.removeChild(this.recentCommands.lastChild);
         }
     }
 
