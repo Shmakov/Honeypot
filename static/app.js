@@ -193,7 +193,17 @@ class HoneypotDashboard {
 
     showEventDetails(event) {
         document.getElementById('detailIp').textContent = event.ip;
-        document.getElementById('detailCountry').textContent = `${this.countryToFlag(event.country_code)} ${event.country_code || 'Unknown'}`;
+        // Get full country name using Intl.DisplayNames
+        let countryName = event.country_code || 'Unknown';
+        if (event.country_code) {
+            try {
+                const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+                countryName = regionNames.of(event.country_code) || event.country_code;
+            } catch (e) {
+                countryName = event.country_code;
+            }
+        }
+        document.getElementById('detailCountry').textContent = `${this.countryToFlag(event.country_code)} ${countryName}`;
         document.getElementById('detailService').textContent = event.service;
         document.getElementById('detailPort').textContent = event.port || '-';
         document.getElementById('detailSize').textContent = this.formatBytes(event.request_size || 0);
