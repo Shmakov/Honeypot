@@ -167,7 +167,7 @@
 
                 <div class="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-80px)]">
                     <!-- Details Grid -->
-                    <div class="grid grid-cols-2 sm:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] gap-4">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div class="bg-gray-800/30 rounded-xl p-4">
                             <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">IP Address</div>
                             <div id="detailIp" class="font-mono text-sm text-white font-medium">-</div>
@@ -177,15 +177,12 @@
                             <div id="detailCountry" class="text-sm text-white font-medium">-</div>
                         </div>
                         <div class="bg-gray-800/30 rounded-xl p-4">
-                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Service</div>
-                            <div id="detailService" class="text-sm text-white font-medium">-</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Service / Port</div>
+                            <div class="text-sm text-white font-medium"><span id="detailService">-</span>:<span
+                                    id="detailPort" class="font-mono">-</span></div>
                         </div>
                         <div class="bg-gray-800/30 rounded-xl p-4">
-                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Port</div>
-                            <div id="detailPort" class="font-mono text-sm text-white font-medium">-</div>
-                        </div>
-                        <div class="bg-gray-800/30 rounded-xl p-4">
-                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Size</div>
+                            <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Payload Size</div>
                             <div id="detailSize" class="font-mono text-sm text-white font-medium">-</div>
                         </div>
                     </div>
