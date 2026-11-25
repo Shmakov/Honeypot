@@ -411,7 +411,7 @@ let currentTileLayer = null;
 const MAX_MARKERS = 500;
 const MARKER_TIMEOUT = 90000; // 90 seconds
 
-function initAttackMap() {
+async function initAttackMap() {
     const mapElement = document.getElementById('attackMap');
     if (!mapElement || attackMap) return;
 
@@ -426,12 +426,11 @@ function initAttackMap() {
             attributionControl: false
         });
 
+        await loadMapConfig();
+
         // Use theme-appropriate tiles
         const theme = window.currentTheme || 'dark';
-        currentTileLayer = L.tileLayer(TILE_URLS[theme], {
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(attackMap);
+        currentTileLayer = createTileLayer(theme).addTo(attackMap);
 
         // Add subtle attribution
         L.control.attribution({
@@ -456,10 +455,7 @@ window.updateMapTheme = function (theme) {
     if (!attackMap || !currentTileLayer) return;
 
     attackMap.removeLayer(currentTileLayer);
-    currentTileLayer = L.tileLayer(TILE_URLS[theme] || TILE_URLS.dark, {
-        subdomains: 'abcd',
-        maxZoom: 19
-    }).addTo(attackMap);
+    currentTileLayer = createTileLayer(theme).addTo(attackMap);
 };
 
 // Create location key for aggregation (round to 2 decimal places ~1km precision)

@@ -19,11 +19,11 @@ class StatsPage {
 
     async init() {
         this.setupTimeFilter();
-        this.initMap();
+        await this.initMap();
         await this.loadData();
     }
 
-    initMap() {
+    async initMap() {
         const mapElement = document.getElementById('statsMap');
         if (!mapElement || statsMap) return;
 
@@ -37,11 +37,10 @@ class StatsPage {
                 attributionControl: false
             });
 
+            await loadMapConfig();
+
             const theme = window.currentTheme || 'dark';
-            currentTileLayer = L.tileLayer(TILE_URLS[theme], {
-                subdomains: 'abcd',
-                maxZoom: 19
-            }).addTo(statsMap);
+            currentTileLayer = createTileLayer(theme).addTo(statsMap);
 
             L.control.attribution({
                 position: 'bottomright',
@@ -430,10 +429,7 @@ window.updateMapTheme = function (theme) {
     if (!statsMap || !currentTileLayer) return;
 
     statsMap.removeLayer(currentTileLayer);
-    currentTileLayer = L.tileLayer(TILE_URLS[theme] || TILE_URLS.dark, {
-        subdomains: 'abcd',
-        maxZoom: 19
-    }).addTo(statsMap);
+    currentTileLayer = createTileLayer(theme).addTo(statsMap);
 };
 
 // Initialize

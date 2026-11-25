@@ -10,6 +10,8 @@ pub struct Config {
     pub geoip: GeoIpConfig,
     pub logging: LoggingConfig,
     pub emulation: EmulationConfig,
+    #[serde(default)]
+    pub map: MapConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -66,13 +68,23 @@ pub struct EmulationConfig {
     pub mysql_version: String,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct MapConfig {
+    #[serde(default)]
+    pub carto_api_key: String,
+}
+
 impl Config {
     pub fn load() -> Result<Self> {
         let config_path = "config.toml";
         
         let builder = config::Config::builder()
             .add_source(config::File::with_name(config_path))
-            .add_source(config::Environment::with_prefix("HONEYPOT"));
+            .add_source(
+                config::Environment::with_prefix("HONEYPOT")
+                    .prefix_separator("_")
+                    .separator("__"),
+            );
 
         let settings = builder.build()?;
         let config: Config = settings.try_deserialize()?;
@@ -119,5 +131,52 @@ impl Config {
 
     pub fn tls_enabled(&self) -> bool {
         !self.server.tls_cert.is_empty() && !self.server.tls_key.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn env_overrides_map_carto_api_key_without_toml_section() {
+        let minimal_toml = r#"
+[server]
+host = "0.0.0.0"
+http_port = 80
+https_port = 443
+tls_cert = ""
+tls_key = ""
+
+[database]
+driver = "sqlite"
+url = "honeypot.db"
+
+[geoip]
+database = "data/GeoLite2-City.mmdb"
+
+[logging]
+level = "info"
+
+[emulation]
+ssh_banner = "SSH-2.0-Test"
+ftp_banner = "220 Test"
+mysql_version = "5.7"
+"#;
+
+        std::env::set_var("HONEYPOT_MAP__CARTO_API_KEY", "test_key_123");
+        let settings = config::Config::builder()
+            .add_source(config::File::from_str(minimal_toml, config::FileFormat::Toml))
+            .add_source(
+                config::Environment::with_prefix("HONEYPOT")
+                    .prefix_separator("_")
+                    .separator("__"),
+            )
+            .build()
+            .unwrap();
+        let cfg: Config = settings.try_deserialize().unwrap();
+        std::env::remove_var("HONEYPOT_MAP__CARTO_API_KEY");
+
+        assert_eq!(cfg.map.carto_api_key, "test_key_123");
     }
 }

@@ -201,6 +201,19 @@ pub async fn api_total_bytes(
     Ok(Json(get_cached_total_bytes(hours, state.db.clone()).await))
 }
 
+/// Client configuration exposed to the frontend
+#[derive(Debug, Serialize)]
+pub struct ClientConfig {
+    pub carto_api_key: String,
+}
+
+/// Serve client-side configuration
+pub async fn api_config(State(state): State<Arc<AppState>>) -> Json<ClientConfig> {
+    Json(ClientConfig {
+        carto_api_key: state.carto_api_key.clone(),
+    })
+}
+
 /// Warm the cache for the default time range (called on startup)
 pub async fn warm_cache(db: &Database) {
     const DEFAULT_HOURS: i64 = 720; // 30 days - matches stats page default

@@ -10,6 +10,51 @@ const TILE_URLS = {
     light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
 };
 
+let cartoApiKey = '';
+let configPromise = null;
+
+/**
+ * Fetch client map configuration once from backend
+ * @returns {Promise<void>}
+ */
+async function loadMapConfig() {
+    if (!configPromise) {
+        configPromise = fetch('/api/config')
+            .then(res => (res.ok ? res.json() : {}))
+            .then(data => {
+                if (data && typeof data.carto_api_key === 'string') {
+                    cartoApiKey = data.carto_api_key;
+                }
+            })
+            .catch(err => {
+                console.warn('Failed to load map config:', err);
+            });
+    }
+    return configPromise;
+}
+
+/**
+ * Build tile URL for a theme, appending CARTO API key if configured
+ * @param {string} theme - Theme name ('dark' or 'light')
+ * @returns {string}
+ */
+function getTileUrl(theme) {
+    const baseUrl = TILE_URLS[theme] || TILE_URLS.dark;
+    return cartoApiKey ? `${baseUrl}?key=${encodeURIComponent(cartoApiKey)}` : baseUrl;
+}
+
+/**
+ * Create a Leaflet tile layer for the given theme
+ * @param {string} theme - Theme name ('dark' or 'light')
+ * @returns {L.TileLayer}
+ */
+function createTileLayer(theme) {
+    return L.tileLayer(getTileUrl(theme), {
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+}
+
 /**
  * Default map options
  */
@@ -41,10 +86,7 @@ function initMap(elementId, options = {}) {
 
         // Use theme-appropriate tiles
         const theme = window.currentTheme || 'dark';
-        const tileLayer = L.tileLayer(TILE_URLS[theme], {
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(map);
+        const tileLayer = createTileLayer(theme).addTo(map);
 
         // Add subtle attribution
         L.control.attribution({
@@ -76,12 +118,7 @@ function updateMapTileLayer(map, currentTileLayer, theme) {
     if (!map || !currentTileLayer) return currentTileLayer;
 
     map.removeLayer(currentTileLayer);
-    const newTileLayer = L.tileLayer(TILE_URLS[theme] || TILE_URLS.dark, {
-        subdomains: 'abcd',
-        maxZoom: 19
-    }).addTo(map);
-
-    return newTileLayer;
+    return createTileLayer(theme).addTo(map);
 }
 
 /**
@@ -126,6 +163,8 @@ function createLocationIcon(count, maxCount) {
 // Export for global use
 if (typeof window !== 'undefined') {
     window.TILE_URLS = TILE_URLS;
+    window.loadMapConfig = loadMapConfig;
+    window.createTileLayer = createTileLayer;
     window.initMap = initMap;
     window.updateMapTileLayer = updateMapTileLayer;
     window.createAttackIcon = createAttackIcon;

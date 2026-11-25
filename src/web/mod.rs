@@ -29,6 +29,7 @@ pub struct AppState {
     pub db: Database,
     pub geoip: SharedGeoIp,
     pub public_url: String,
+    pub carto_api_key: String,
     pub write_tx: WriteSender,
 }
 
@@ -211,6 +212,7 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         db,
         geoip,
         public_url: config.server.public_url.clone(),
+        carto_api_key: config.map.carto_api_key.clone(),
         write_tx,
     });
 
@@ -223,6 +225,7 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         // SSE endpoint
         .route("/events", get(sse::events_handler))
         // API endpoints
+        .route("/api/config", get(routes::api_config))
         .route("/api/stats", get(routes::api_stats))
         .route("/api/recent", get(routes::api_recent))
         .route("/api/countries", get(routes::api_countries))
