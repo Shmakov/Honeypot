@@ -82,8 +82,11 @@ async fn main() -> Result<()> {
     // Start background tasks for rollup aggregation
     web::start_background_tasks(db_arc);
 
-    // Warm the cache for default time ranges
-    web::warm_cache(&db).await;
+    // Warm the cache in the background so the web server binds immediately
+    let warm_db = db.clone();
+    tokio::spawn(async move {
+        web::warm_cache(&warm_db).await;
+    });
 
     // Start web server (blocking) - pass write_tx for HTTP event logging
     web::start_server(&config, event_bus, db, geoip, write_tx).await?;
