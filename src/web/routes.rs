@@ -67,7 +67,7 @@ fn validate_hours(hours: i64) -> Result<i64, ApiError> {
 }
 
 /// Cached stats query - 5 minute TTL (uses hybrid rollup + live)
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
 async fn get_cached_stats(hours: i64, db: Database) -> StatsResponse {
     db.get_stats_hybrid(hours).await.unwrap_or_else(|_| StatsResponse {
         total: 0,
@@ -78,43 +78,43 @@ async fn get_cached_stats(hours: i64, db: Database) -> StatsResponse {
 }
 
 /// Cached countries query - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
 async fn get_cached_countries(hours: i64, db: Database) -> Vec<CountryStat> {
     db.get_country_stats(hours).await.unwrap_or_default()
 }
 
 /// Cached locations query - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
 async fn get_cached_locations(hours: i64, db: Database) -> Vec<LocationStat> {
     db.get_location_stats(hours, 2000).await.unwrap_or_default()
 }
 
 /// Cached recent credentials - 60 second TTL
-#[cached(time = 60, key = "()", convert = r#"{ () }"#)]
+#[cached(time = 60, key = "()", convert = r#"{ () }"#, sync_writes = true)]
 async fn get_cached_recent_credentials(db: Database) -> Vec<(String, String)> {
     db.get_recent_credentials(10).await.unwrap_or_default()
 }
 
 /// Cached recent commands - 60 second TTL
-#[cached(time = 60, key = "()", convert = r#"{ () }"#)]
+#[cached(time = 60, key = "()", convert = r#"{ () }"#, sync_writes = true)]
 async fn get_cached_recent_commands(db: Database) -> Vec<String> {
     db.get_recent_commands(10).await.unwrap_or_default()
 }
 
 /// Cached top IPs by request count - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
 async fn get_cached_top_ips_requests(hours: i64, db: Database) -> Vec<IpStat> {
     db.get_top_ips_by_requests(hours, 25).await.unwrap_or_default()
 }
 
 /// Cached top IPs by bandwidth - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
 async fn get_cached_top_ips_bandwidth(hours: i64, db: Database) -> Vec<IpStat> {
     db.get_top_ips_by_bandwidth(hours, 25).await.unwrap_or_default()
 }
 
 /// Cached total bytes - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#)]
+#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
 async fn get_cached_total_bytes(hours: i64, db: Database) -> i64 {
     db.get_total_bytes(hours).await.unwrap_or(0)
 }
@@ -220,13 +220,11 @@ pub async fn warm_cache(db: &Database) {
     
     tracing::info!("Warming cache for {} hour time range...", DEFAULT_HOURS);
     
-    // Warm all three caches in parallel
-    let _ = tokio::join!(
-        get_cached_stats(DEFAULT_HOURS, db.clone()),
-        get_cached_countries(DEFAULT_HOURS, db.clone()),
-        get_cached_locations(DEFAULT_HOURS, db.clone()),
-        get_cached_recent_credentials(db.clone())
-    );
+    // Run sequentially so startup warming never starves write_buffer or live requests
+    let _ = get_cached_stats(DEFAULT_HOURS, db.clone()).await;
+    let _ = get_cached_countries(DEFAULT_HOURS, db.clone()).await;
+    let _ = get_cached_locations(DEFAULT_HOURS, db.clone()).await;
+    let _ = get_cached_recent_credentials(db.clone()).await;
     
     tracing::info!("Cache warmed successfully");
 }

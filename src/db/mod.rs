@@ -480,11 +480,13 @@ impl Database {
     }
 
     async fn get_top_credentials_raw(&self, since_ts: i64, limit: i32) -> Result<Vec<CredentialStat>> {
+        // Unary `+` prevents SQLite from scanning the entire partial idx_credentials(username, id DESC)
+        // across all history and forces a timestamp index range scan.
         let rows: Vec<(String, String, i64)> = sqlx::query_as(
             r#"
             SELECT username, password, COUNT(*) as count 
             FROM requests 
-            WHERE timestamp > ? AND username IS NOT NULL 
+            WHERE timestamp > ? AND +username IS NOT NULL 
             GROUP BY username, password 
             ORDER BY count DESC 
             LIMIT ?
@@ -813,9 +815,10 @@ impl Database {
         let path_json = serde_json::to_string(&path_counts)?;
         
         // Get credential counts (top 100)
+        // Unary `+` guarantees SQLite uses a timestamp index range scan instead of idx_credentials.
         let cred_rows: Vec<(String, String, i64)> = sqlx::query_as(
             r#"SELECT username, password, COUNT(*) as c FROM requests 
-               WHERE timestamp >= ? AND timestamp < ? AND username IS NOT NULL 
+               WHERE timestamp >= ? AND timestamp < ? AND +username IS NOT NULL 
                GROUP BY username, password ORDER BY c DESC LIMIT 100"#
         )
         .bind(day_start)
@@ -899,7 +902,8 @@ impl Database {
 
     /// Get days that need to be backfilled (have requests but no rollup)
     pub async fn get_days_needing_rollup(&self) -> Result<Vec<i64>> {
-        // Find distinct days in requests that are not in stats_daily
+        const DAY_MS: i64 = 86_400_000;
+
         // Only consider complete days (not today)
         let today_start = {
             let now = Utc::now();
@@ -907,21 +911,57 @@ impl Database {
                 .unwrap()
                 .timestamp_millis()
         };
-        
-        let rows: Vec<(i64,)> = sqlx::query_as(
-            r#"
-            SELECT DISTINCT (timestamp / 86400000) * 86400000 as day_bucket
-            FROM requests
-            WHERE timestamp < ?
-            AND (timestamp / 86400000) * 86400000 NOT IN (SELECT day_bucket FROM stats_daily)
-            ORDER BY day_bucket
-            "#
+
+        // Load already rolled-up day buckets from the small stats_daily table
+        let existing_rows: Vec<(i64,)> = sqlx::query_as("SELECT day_bucket FROM stats_daily")
+            .fetch_all(&self.pool)
+            .await?;
+        let existing: std::collections::HashSet<i64> =
+            existing_rows.into_iter().map(|(d,)| d).collect();
+
+        // Find the earliest timestamp before today via covering timestamp index (O(1))
+        let (first_ts,): (Option<i64>,) = sqlx::query_as(
+            "SELECT MIN(timestamp) FROM requests WHERE timestamp < ?"
         )
         .bind(today_start)
-        .fetch_all(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
-        
-        Ok(rows.into_iter().map(|(d,)| d).collect())
+
+        let Some(first_ts) = first_ts else {
+            return Ok(Vec::new());
+        };
+
+        let mut missing = Vec::new();
+        let mut cursor = ts_to_day_bucket(first_ts);
+
+        while cursor < today_start {
+            // Skip contiguous already-aggregated days in memory without querying SQLite
+            if existing.contains(&cursor) {
+                cursor += DAY_MS;
+                continue;
+            }
+
+            // Jump to the next timestamp >= cursor via covering timestamp index (O(1))
+            let (next_ts,): (Option<i64>,) = sqlx::query_as(
+                "SELECT MIN(timestamp) FROM requests WHERE timestamp >= ? AND timestamp < ?"
+            )
+            .bind(cursor)
+            .bind(today_start)
+            .fetch_one(&self.pool)
+            .await?;
+
+            let Some(next_ts) = next_ts else {
+                break;
+            };
+
+            let day = ts_to_day_bucket(next_ts);
+            if !existing.contains(&day) {
+                missing.push(day);
+            }
+            cursor = day + DAY_MS;
+        }
+
+        Ok(missing)
     }
 }
 
@@ -1035,4 +1075,156 @@ pub struct LocationStat {
 pub struct IpStat {
     pub ip: String,
     pub count: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    struct TempDb {
+        path: PathBuf,
+        db: Database,
+    }
+
+    impl Drop for TempDb {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.path);
+            let _ = std::fs::remove_file(format!("{}-wal", self.path.display()));
+            let _ = std::fs::remove_file(format!("{}-shm", self.path.display()));
+        }
+    }
+
+    async fn setup_temp_db() -> TempDb {
+        let path = std::env::temp_dir()
+            .join(format!("honeypot_test_{}.db", uuid::Uuid::new_v4()));
+        let cfg = DatabaseConfig {
+            driver: "sqlite".to_string(),
+            url: path.to_string_lossy().into_owned(),
+            cache_size_mb: 16,
+        };
+        let db = Database::new(&cfg).await.unwrap();
+        db.run_migrations().await.unwrap();
+        TempDb { path, db }
+    }
+
+    async fn insert_request(
+        db: &Database,
+        ts_ms: i64,
+        service: &str,
+        username: Option<&str>,
+        password: Option<&str>,
+    ) {
+        sqlx::query(
+            "INSERT INTO requests (timestamp, ip, service, username, password, request_size) VALUES (?, '1.2.3.4', ?, ?, ?, 10)",
+        )
+        .bind(ts_ms)
+        .bind(service)
+        .bind(username)
+        .bind(password)
+        .execute(&db.pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_get_days_needing_rollup_skips_existing_and_gaps() {
+        const DAY_MS: i64 = 86_400_000;
+        let tmp = setup_temp_db().await;
+        let db = &tmp.db;
+
+        // Empty DB has no days needing rollup
+        assert_eq!(db.get_days_needing_rollup().await.unwrap(), Vec::<i64>::new());
+
+        let today_start = {
+            let now = Utc::now();
+            Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
+                .unwrap()
+                .timestamp_millis()
+        };
+
+        let day_10 = today_start - 10 * DAY_MS;
+        let day_9 = today_start - 9 * DAY_MS;
+        let day_5 = today_start - 5 * DAY_MS;
+        let day_2 = today_start - 2 * DAY_MS;
+
+        insert_request(db, day_10 + 1000, "ssh", None, None).await;
+        insert_request(db, day_9 + 2000, "ssh", None, None).await;
+        insert_request(db, day_5 + 3000, "ssh", None, None).await;
+        insert_request(db, day_2 + 4000, "ssh", None, None).await;
+        insert_request(db, today_start + 1000, "ssh", None, None).await; // Today should be excluded
+
+        // Mark day_10 and day_9 as already rolled up
+        for day in [day_10, day_9] {
+            sqlx::query("INSERT INTO stats_daily (day_bucket, total_requests) VALUES (?, 1)")
+                .bind(day)
+                .execute(&db.pool)
+                .await
+                .unwrap();
+        }
+
+        let needing = db.get_days_needing_rollup().await.unwrap();
+        assert_eq!(needing, vec![day_5, day_2]);
+    }
+
+    #[tokio::test]
+    async fn test_top_credentials_raw_uses_timestamp_index_and_counts_correctly() {
+        let tmp = setup_temp_db().await;
+        let db = &tmp.db;
+
+        let now_ms = Utc::now().timestamp_millis();
+        let since_ts = now_ms - 60_000;
+
+        // Before since_ts (excluded)
+        insert_request(db, since_ts - 5_000, "ssh", Some("old"), Some("oldpass")).await;
+        // After since_ts with no username (excluded)
+        insert_request(db, since_ts + 1_000, "http", None, None).await;
+        // After since_ts with credentials (included)
+        insert_request(db, since_ts + 2_000, "ssh", Some("root"), Some("123456")).await;
+        insert_request(db, since_ts + 3_000, "ssh", Some("root"), Some("123456")).await;
+        insert_request(db, since_ts + 4_000, "ssh", Some("admin"), Some("admin")).await;
+
+        let top = db.get_top_credentials_raw(since_ts, 10).await.unwrap();
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].username, "root");
+        assert_eq!(top[0].password, "123456");
+        assert_eq!(top[0].count, 2);
+        assert_eq!(top[1].username, "admin");
+        assert_eq!(top[1].password, "admin");
+        assert_eq!(top[1].count, 1);
+
+        let plan_rows: Vec<(i64, i64, i64, String)> = sqlx::query_as(
+            r#"
+            EXPLAIN QUERY PLAN
+            SELECT username, password, COUNT(*) as count
+            FROM requests
+            WHERE timestamp > ? AND +username IS NOT NULL
+            GROUP BY username, password
+            ORDER BY count DESC
+            LIMIT ?
+            "#,
+        )
+        .bind(since_ts)
+        .bind(10_i32)
+        .fetch_all(&db.pool)
+        .await
+        .unwrap();
+
+        let plan_text = plan_rows
+            .into_iter()
+            .map(|(_, _, _, detail)| detail)
+            .collect::<Vec<_>>()
+            .join(" | ");
+
+        assert!(
+            !plan_text.contains("idx_credentials"),
+            "Query plan should not use idx_credentials: {}",
+            plan_text
+        );
+        assert!(
+            plan_text.contains("timestamp"),
+            "Query plan should filter using a timestamp index: {}",
+            plan_text
+        );
+    }
 }
