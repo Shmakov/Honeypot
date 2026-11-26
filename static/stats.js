@@ -15,11 +15,21 @@ const SERVICE_PALETTE = [
     '#6b7280', // gray (other)
 ];
 
+const EMPTY_ICONS = {
+    shield: '<svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
+    globe: '<svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
+    tag: '<svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
+    network: '<svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>'
+};
+
+const ZAP_ICON = '<svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>';
+
 class StatsPage {
     constructor() {
         this.countriesData = [];
         this.timeseriesData = null;
         this.barHitboxes = [];
+        this.selectedHours = 720;
         this.loadingOverlay = document.getElementById('loadingOverlay');
         this.init();
     }
@@ -104,7 +114,41 @@ class StatsPage {
 
     setupTimeFilter() {
         const select = document.getElementById('timeRange');
-        select.addEventListener('change', () => this.loadData());
+        const buttons = document.querySelectorAll('#timeRangeGroup button[data-hours]');
+
+        const syncButtons = (hours) => {
+            buttons.forEach(btn => {
+                const isActive = parseInt(btn.dataset.hours, 10) === hours;
+                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                btn.classList.toggle('active', isActive);
+                btn.classList.toggle('bg-amber-500/15', isActive);
+                btn.classList.toggle('text-amber-400', isActive);
+                btn.classList.toggle('border', isActive);
+                btn.classList.toggle('border-amber-500/30', isActive);
+                btn.classList.toggle('text-gray-400', !isActive);
+                btn.classList.toggle('hover:text-gray-200', !isActive);
+            });
+            if (select) select.value = String(hours);
+        };
+
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const hours = parseInt(btn.dataset.hours, 10);
+                if (hours === this.selectedHours) return;
+                this.selectedHours = hours;
+                syncButtons(hours);
+                this.loadData();
+            });
+        });
+
+        if (select) {
+            select.addEventListener('change', () => {
+                const hours = parseInt(select.value, 10);
+                this.selectedHours = hours;
+                syncButtons(hours);
+                this.loadData();
+            });
+        }
     }
 
     setupTimeseriesInteractions() {
@@ -138,7 +182,7 @@ class StatsPage {
                 .join('');
 
             const statusBadge = p.is_spike
-                ? `<div class="text-amber-400 font-semibold mt-1">⚡ Wave detected (${p.multiplier.toFixed(1)}× baseline)</div>`
+                ? `<div class="inline-flex items-center gap-1 text-amber-400 font-semibold mt-1">${ZAP_ICON}<span>Wave detected (${p.multiplier.toFixed(1)}× baseline)</span></div>`
                 : p.partial
                     ? `<div class="text-cyan-400 mt-1">In progress (live bucket)</div>`
                     : p.baseline > 0
@@ -170,10 +214,12 @@ class StatsPage {
 
     async loadData() {
         const select = document.getElementById('timeRange');
-        const hours = parseInt(select.value, 10);
+        const buttons = document.querySelectorAll('#timeRangeGroup button[data-hours]');
+        const hours = this.selectedHours || (select ? parseInt(select.value, 10) : 720);
 
         this.showLoading(true);
-        select.disabled = true;
+        if (select) select.disabled = true;
+        buttons.forEach(btn => { btn.disabled = true; });
 
         try {
             const [
@@ -233,7 +279,8 @@ class StatsPage {
             if (totalEl) totalEl.textContent = 'Error';
         } finally {
             this.showLoading(false);
-            select.disabled = false;
+            if (select) select.disabled = false;
+            buttons.forEach(btn => { btn.disabled = false; });
         }
     }
 
@@ -252,7 +299,8 @@ class StatsPage {
             if (data.spikes && data.spikes.count > 0) {
                 spikeBadge.classList.remove('hidden');
                 spikeBadge.classList.add('inline-flex');
-                spikeBadge.textContent = `⚡ ${data.spikes.count} wave${data.spikes.count > 1 ? 's' : ''} detected • Peak ${data.spikes.peak_multiplier.toFixed(1)}× baseline`;
+                const waveLabel = `${data.spikes.count} wave${data.spikes.count > 1 ? 's' : ''} detected • Peak ${data.spikes.peak_multiplier.toFixed(1)}× baseline`;
+                spikeBadge.innerHTML = `${ZAP_ICON}<span>${this.escapeHtml(waveLabel)}</span>`;
             } else {
                 spikeBadge.classList.add('hidden');
                 spikeBadge.classList.remove('inline-flex');
@@ -430,8 +478,8 @@ class StatsPage {
 
         if (!items || items.length === 0) {
             container.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full text-gray-500">
-                    <span class="text-2xl mb-2">${emptyIcon}</span>
+                <div class="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
+                    ${emptyIcon}
                     <span>${this.escapeHtml(emptyLabel)}</span>
                 </div>`;
             return;
@@ -463,7 +511,7 @@ class StatsPage {
     updateServicesChart(services) {
         const sorted = [...(services || [])].sort((a, b) => b.count - a.count);
         const items = sorted.map(s => ({ labelHtml: this.escapeHtml(s.service), count: s.count }));
-        this.renderBarList('servicesChart', items, '🛡️', 'No service data available', ['245, 158, 11', '249, 115, 22']);
+        this.renderBarList('servicesChart', items, EMPTY_ICONS.shield, 'No service data available', ['245, 158, 11', '249, 115, 22']);
     }
 
     updateCountriesChart(countries) {
@@ -480,7 +528,7 @@ class StatsPage {
             }
             return { labelHtml: `${flag} ${this.escapeHtml(name)}`, count: c.count };
         });
-        this.renderBarList('countriesChart', items, '🌎', 'No country data available', ['59, 130, 246', '99, 102, 241']);
+        this.renderBarList('countriesChart', items, EMPTY_ICONS.globe, 'No country data available', ['59, 130, 246', '99, 102, 241']);
     }
 
     updateIntelligenceSection(intel, totalRequests) {
@@ -493,7 +541,7 @@ class StatsPage {
         this.renderBarList(
             'tagsChart',
             (intel.tags || []).map(t => ({ labelHtml: this.escapeHtml(t.name), count: t.count })),
-            '🏷️',
+            EMPTY_ICONS.tag,
             'No attack tags recorded in this window',
             ['239, 68, 68', '245, 158, 11']
         );
@@ -501,7 +549,7 @@ class StatsPage {
         this.renderBarList(
             'asnsChart',
             (intel.asns || []).map(a => ({ labelHtml: this.escapeHtml(a.name), count: a.count })),
-            '🌐',
+            EMPTY_ICONS.network,
             'No ASN data captured yet',
             ['139, 92, 246', '99, 102, 241']
         );

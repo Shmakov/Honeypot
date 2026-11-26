@@ -58,77 +58,131 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-wrap items-center justify-between gap-y-3 py-3 sm:py-0 sm:h-16">
                     <!-- Row 1 on mobile: Logo + Theme Toggle -->
-                    <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity order-1">
-                        <span class="text-2xl">🍯</span>
-                        <span
-                            class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Honeypot</span>
+                    <a href="/" class="flex items-center gap-2.5 hover:opacity-85 transition-opacity order-1">
+                        <svg class="w-7 h-7 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="hp-logo-grad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stop-color="#fbbf24"/>
+                                    <stop offset="55%" stop-color="#f59e0b"/>
+                                    <stop offset="100%" stop-color="#ea580c"/>
+                                </linearGradient>
+                            </defs>
+                            <polygon points="16,4.6 21.72,7.9 21.72,14.5 16,17.8 10.28,14.5 10.28,7.9" fill="none" stroke="url(#hp-logo-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+                            <polygon points="10.28,14.5 16,17.8 16,24.4 10.28,27.7 4.56,24.4 4.56,17.8" fill="none" stroke="url(#hp-logo-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+                            <polygon points="21.72,14.5 27.44,17.8 27.44,24.4 21.72,27.7 16,24.4 16,17.8" fill="none" stroke="url(#hp-logo-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+                            <polygon points="16,13.2 19.98,15.5 19.98,20.1 16,22.4 12.02,20.1 12.02,15.5" fill="url(#hp-logo-grad)"/>
+                        </svg>
+                        <span class="text-xl font-bold tracking-tight text-white">Honeypot</span>
                     </a>
 
                     <button id="themeToggle"
-                        class="p-2.5 rounded-lg hover:bg-gray-800 transition-colors text-xl order-2 sm:order-3"
-                        title="Toggle theme">🌙</button>
+                        class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-800 text-gray-400 hover:text-gray-100 hover:bg-gray-800 transition-colors order-2 sm:order-3"
+                        aria-label="Toggle theme" title="Toggle theme">
+                        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                        </svg>
+                    </button>
 
-                    <!-- Row 2 on mobile: Navigation + Time Range -->
-                    <div class="flex flex-wrap items-center gap-2 order-3 sm:order-2 w-full sm:w-auto">
-                        <nav class="flex items-center gap-2">
-                            <a href="/"
-                                class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Dashboard</a>
-                            <a href="/stats"
-                                class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Statistics</a>
-                        </nav>
-                        <select id="timeRange"
-                            class="bg-gray-800 border border-gray-700 rounded-lg px-3 sm:px-4 py-2 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-                            <option value="24">Last 24 Hours</option>
-                            <option value="168">Last 7 Days</option>
-                            <option value="720" selected>Last 30 Days</option>
-                            <option value="8760">Last Year</option>
-                        </select>
-                    </div>
+                    <!-- Row 2 on mobile: Navigation -->
+                    <nav class="flex items-center gap-2 order-3 sm:order-2 w-full sm:w-auto">
+                        <a href="/"
+                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800/70 transition-colors">Dashboard</a>
+                        <a href="/stats"
+                            class="nav-active px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 transition-colors">Statistics</a>
+                    </nav>
                 </div>
             </div>
         </header>
 
-        <main class="max-w-7xl mx-auto px-6 lg:px-8 py-8">
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+            <!-- Page Sub-Header -->
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-xl font-bold text-white tracking-tight">Statistics</h1>
+                    <p class="text-sm text-gray-400 mt-0.5">Aggregated attack telemetry &amp; threat intelligence</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div id="timeRangeGroup" role="group" aria-label="Time range"
+                        class="inline-flex items-center p-1 rounded-xl bg-gray-900/80 border border-gray-800 gap-1">
+                        <button type="button" data-hours="24"
+                            class="time-range-btn px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors">24H</button>
+                        <button type="button" data-hours="168"
+                            class="time-range-btn px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors">7D</button>
+                        <button type="button" data-hours="720" aria-pressed="true"
+                            class="time-range-btn active px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30 transition-colors">30D</button>
+                        <button type="button" data-hours="8760"
+                            class="time-range-btn px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors">1Y</button>
+                    </div>
+                    <select id="timeRange" class="sr-only" aria-hidden="true" tabindex="-1">
+                        <option value="24">Last 24 Hours</option>
+                        <option value="168">Last 7 Days</option>
+                        <option value="720" selected>Last 30 Days</option>
+                        <option value="8760">Last Year</option>
+                    </select>
+                </div>
+            </div>
 
             <!-- Stats Cards -->
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-5 mb-8">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6 hover:border-gray-700 transition-colors">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-gray-500 text-sm font-medium">Total Requests</span>
-                        <span class="text-2xl">🎯</span>
+                        <span class="text-gray-400 text-sm font-medium">Total Requests</span>
+                        <span class="w-8 h-8 rounded-lg bg-gray-800/70 border border-gray-700/50 inline-flex items-center justify-center text-amber-400">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>
+                            </svg>
+                        </span>
                     </div>
-                    <div id="totalRequests" class="text-3xl font-bold text-white">-</div>
+                    <div id="totalRequests" class="text-3xl font-bold text-white tabular-nums">-</div>
                 </div>
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6 hover:border-gray-700 transition-colors">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-gray-500 text-sm font-medium">Total Traffic</span>
-                        <span class="text-2xl">📊</span>
+                        <span class="text-gray-400 text-sm font-medium">Total Traffic</span>
+                        <span class="w-8 h-8 rounded-lg bg-gray-800/70 border border-gray-700/50 inline-flex items-center justify-center text-cyan-400">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m21 16-4 4-4-4"/>
+                                <path d="M17 20V4"/>
+                                <path d="m3 8 4-4 4 4"/>
+                                <path d="M7 4v16"/>
+                            </svg>
+                        </span>
                     </div>
-                    <div id="totalTraffic" class="text-3xl font-bold text-white">-</div>
+                    <div id="totalTraffic" class="text-3xl font-bold text-white tabular-nums">-</div>
                 </div>
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6 hover:border-gray-700 transition-colors">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-gray-500 text-sm font-medium">Services Targeted</span>
-                        <span class="text-2xl">🛡️</span>
+                        <span class="text-gray-400 text-sm font-medium">Services Targeted</span>
+                        <span class="w-8 h-8 rounded-lg bg-gray-800/70 border border-gray-700/50 inline-flex items-center justify-center text-blue-400">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+                            </svg>
+                        </span>
                     </div>
-                    <div id="uniqueServices" class="text-3xl font-bold text-white">-</div>
+                    <div id="uniqueServices" class="text-3xl font-bold text-white tabular-nums">-</div>
                 </div>
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-colors">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6 hover:border-gray-700 transition-colors">
                     <div class="flex items-center justify-between mb-3">
-                        <span class="text-gray-500 text-sm font-medium">Countries</span>
-                        <span class="text-2xl">🌎</span>
+                        <span class="text-gray-400 text-sm font-medium">Countries</span>
+                        <span class="w-8 h-8 rounded-lg bg-gray-800/70 border border-gray-700/50 inline-flex items-center justify-center text-emerald-400">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/>
+                                <path d="M2 12h20"/>
+                            </svg>
+                        </span>
                     </div>
-                    <div id="uniqueCountries" class="text-3xl font-bold text-white">-</div>
+                    <div id="uniqueCountries" class="text-3xl font-bold text-white tabular-nums">-</div>
                 </div>
             </div>
 
             <!-- Attack Activity & Wave Detection -->
             <div
-                class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden mb-8">
+                class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-800 flex flex-wrap items-center justify-between gap-3">
                     <div class="flex items-center gap-3">
                         <h3 class="text-lg font-semibold text-white">Attack Activity &amp; Wave Detection</h3>
@@ -149,7 +203,7 @@
 
             <!-- Request Map (Full Width) -->
             <div
-                class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden mb-8">
+                class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-800">
                     <h3 class="text-lg font-semibold text-white">Request Origins</h3>
                 </div>
@@ -157,16 +211,16 @@
             </div>
 
             <!-- Charts Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6">
                     <h3 class="text-lg font-semibold text-white mb-4">Requests by Service</h3>
-                    <div id="servicesChart" class="h-72 overflow-y-auto space-y-1 pr-2">
+                    <div id="servicesChart" class="h-72 overflow-y-auto space-y-1 pr-2 pb-2">
                         <div class="text-gray-500 text-center py-8">Loading...</div>
                     </div>
                 </div>
-                <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
+                <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6">
                     <h3 class="text-lg font-semibold text-white mb-4">Top Countries</h3>
-                    <div id="countriesChart" class="h-72 overflow-y-auto space-y-1 pr-2">
+                    <div id="countriesChart" class="h-72 overflow-y-auto space-y-1 pr-2 pb-2">
                         <div class="text-gray-500 text-center py-8">Loading...</div>
                     </div>
                 </div>
@@ -176,25 +230,29 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Credentials Table -->
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-800">
                         <h3 class="text-lg font-semibold text-white">Top SSH/FTP Credentials</h3>
                         <p class="text-sm text-gray-500 mt-1">Most attempted username:password combinations</p>
                     </div>
                     <div class="overflow-x-auto overflow-y-auto max-h-80">
                         <table class="w-full">
-                            <thead class="bg-gray-800/30">
-                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    <th class="px-6 py-4">Username</th>
-                                    <th class="px-6 py-4">Password</th>
-                                    <th class="px-6 py-4 text-right">Count</th>
+                            <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3.5">Username</th>
+                                    <th class="px-6 py-3.5">Password</th>
+                                    <th class="px-6 py-3.5 text-right">Count</th>
                                 </tr>
                             </thead>
                             <tbody id="credentialsTable" class="divide-y divide-gray-800/50">
                                 <tr>
                                     <td colspan="3" class="px-6 py-8 text-center text-gray-500">
                                         <div class="flex flex-col items-center gap-2">
-                                            <span class="text-2xl">📊</span>
+                                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <line x1="18" x2="18" y1="20" y2="10"/>
+                                                <line x1="12" x2="12" y1="20" y2="4"/>
+                                                <line x1="6" x2="6" y1="20" y2="14"/>
+                                            </svg>
                                             <span>Loading data...</span>
                                         </div>
                                     </td>
@@ -206,24 +264,28 @@
 
                 <!-- Paths Table -->
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-800">
                         <h3 class="text-lg font-semibold text-white">Top HTTP Paths</h3>
                         <p class="text-sm text-gray-500 mt-1">Most requested endpoint paths</p>
                     </div>
                     <div class="overflow-x-auto overflow-y-auto max-h-80">
                         <table class="w-full">
-                            <thead class="bg-gray-800/30">
-                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    <th class="px-6 py-4">Path</th>
-                                    <th class="px-6 py-4 text-right">Count</th>
+                            <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3.5">Path</th>
+                                    <th class="px-6 py-3.5 text-right">Count</th>
                                 </tr>
                             </thead>
                             <tbody id="pathsTable" class="divide-y divide-gray-800/50">
                                 <tr>
                                     <td colspan="2" class="px-6 py-8 text-center text-gray-500">
                                         <div class="flex flex-col items-center gap-2">
-                                            <span class="text-2xl">📊</span>
+                                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <line x1="18" x2="18" y1="20" y2="10"/>
+                                                <line x1="12" x2="12" y1="20" y2="4"/>
+                                                <line x1="6" x2="6" y1="20" y2="14"/>
+                                            </svg>
                                             <span>Loading data...</span>
                                         </div>
                                     </td>
@@ -235,27 +297,31 @@
             </div>
 
             <!-- IP Stats Tables Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Top IPs by Requests -->
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-800">
                         <h3 class="text-lg font-semibold text-white">Top IPs by Requests</h3>
                         <p class="text-sm text-gray-500 mt-1">Most active IP addresses by request count</p>
                     </div>
                     <div class="overflow-x-auto overflow-y-auto max-h-80">
                         <table class="w-full">
-                            <thead class="bg-gray-800/30">
-                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    <th class="px-6 py-4">IP Address</th>
-                                    <th class="px-6 py-4 text-right">Requests</th>
+                            <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3.5">IP Address</th>
+                                    <th class="px-6 py-3.5 text-right">Requests</th>
                                 </tr>
                             </thead>
                             <tbody id="topIpsRequestsTable" class="divide-y divide-gray-800/50">
                                 <tr>
                                     <td colspan="2" class="px-6 py-8 text-center text-gray-500">
                                         <div class="flex flex-col items-center gap-2">
-                                            <span class="text-2xl">📊</span>
+                                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <line x1="18" x2="18" y1="20" y2="10"/>
+                                                <line x1="12" x2="12" y1="20" y2="4"/>
+                                                <line x1="6" x2="6" y1="20" y2="14"/>
+                                            </svg>
                                             <span>Loading data...</span>
                                         </div>
                                     </td>
@@ -267,24 +333,28 @@
 
                 <!-- Top IPs by Bandwidth -->
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-800">
                         <h3 class="text-lg font-semibold text-white">Top IPs by Bandwidth</h3>
                         <p class="text-sm text-gray-500 mt-1">IP addresses with most traffic volume</p>
                     </div>
                     <div class="overflow-x-auto overflow-y-auto max-h-80">
                         <table class="w-full">
-                            <thead class="bg-gray-800/30">
-                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    <th class="px-6 py-4">IP Address</th>
-                                    <th class="px-6 py-4 text-right">Bandwidth</th>
+                            <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                    <th class="px-6 py-3.5">IP Address</th>
+                                    <th class="px-6 py-3.5 text-right">Bandwidth</th>
                                 </tr>
                             </thead>
                             <tbody id="topIpsBandwidthTable" class="divide-y divide-gray-800/50">
                                 <tr>
                                     <td colspan="2" class="px-6 py-8 text-center text-gray-500">
                                         <div class="flex flex-col items-center gap-2">
-                                            <span class="text-2xl">📊</span>
+                                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <line x1="18" x2="18" y1="20" y2="10"/>
+                                                <line x1="12" x2="12" y1="20" y2="4"/>
+                                                <line x1="6" x2="6" y1="20" y2="14"/>
+                                            </svg>
                                             <span>Loading data...</span>
                                         </div>
                                     </td>
@@ -296,7 +366,7 @@
             </div>
 
             <!-- Attack Intelligence Section -->
-            <div class="mt-8 space-y-6">
+            <div class="pt-2 space-y-6">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <h2 class="text-xl font-bold text-white">Attack Intelligence</h2>
                     <span id="scannerSummary"
@@ -305,15 +375,15 @@
 
                 <!-- Tags & ASNs -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
+                    <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-4">Top Attack Tags</h3>
-                        <div id="tagsChart" class="h-64 overflow-y-auto space-y-1 pr-2">
+                        <div id="tagsChart" class="h-64 overflow-y-auto space-y-1 pr-2 pb-2">
                             <div class="text-gray-500 text-center py-8">Loading...</div>
                         </div>
                     </div>
-                    <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
+                    <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-4">Top ASNs / Networks</h3>
-                        <div id="asnsChart" class="h-64 overflow-y-auto space-y-1 pr-2">
+                        <div id="asnsChart" class="h-64 overflow-y-auto space-y-1 pr-2 pb-2">
                             <div class="text-gray-500 text-center py-8">Loading...</div>
                         </div>
                     </div>
@@ -322,15 +392,15 @@
                 <!-- Commands & User-Agents -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div
-                        class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                        class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                         <div class="px-6 py-4 border-b border-gray-800">
                             <h3 class="text-lg font-semibold text-white">Top Shell Commands</h3>
                             <p class="text-xs text-gray-500 mt-1">SSH &amp; Telnet activity</p>
                         </div>
                         <div class="overflow-x-auto overflow-y-auto max-h-72">
                             <table class="w-full">
-                                <thead class="bg-gray-800/30">
-                                    <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+                                    <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                         <th class="px-5 py-3">Command</th>
                                         <th class="px-5 py-3 text-right">Count</th>
                                     </tr>
@@ -341,15 +411,15 @@
                     </div>
 
                     <div
-                        class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                        class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                         <div class="px-6 py-4 border-b border-gray-800">
                             <h3 class="text-lg font-semibold text-white">Top Clients / User-Agents</h3>
                             <p class="text-xs text-gray-500 mt-1">HTTP UAs &amp; SSH client banners</p>
                         </div>
                         <div class="overflow-x-auto overflow-y-auto max-h-72">
                             <table class="w-full">
-                                <thead class="bg-gray-800/30">
-                                    <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+                                    <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                         <th class="px-5 py-3">Client</th>
                                         <th class="px-5 py-3 text-right">Count</th>
                                     </tr>
@@ -362,15 +432,15 @@
 
                 <!-- Recent Captured IOCs -->
                 <div
-                    class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
+                    class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-800">
                         <h3 class="text-lg font-semibold text-white">Recent Captured IOCs</h3>
                         <p class="text-sm text-gray-500 mt-1">Defanged dropper URLs, mining pools, and decoded payloads</p>
                     </div>
                     <div class="overflow-x-auto overflow-y-auto max-h-80">
                         <table class="w-full">
-                            <thead class="bg-gray-800/30">
-                                <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
+                                <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                     <th class="px-6 py-3">Time</th>
                                     <th class="px-6 py-3">IP</th>
                                     <th class="px-6 py-3">Service</th>

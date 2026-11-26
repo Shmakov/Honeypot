@@ -47,26 +47,41 @@
     <div id="app" class="min-h-screen">
 
         <!-- Header -->
-        <header class="sticky top-0 z-[9999] bg-gray-900 border-b border-gray-800">
+        <header class="sticky top-0 z-[9999] backdrop-blur-xl bg-gray-900/80 border-b border-gray-800">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex flex-wrap items-center justify-between gap-y-3 py-3 sm:py-0 sm:h-16">
                     <!-- Row 1 on mobile: Logo + Theme Toggle -->
-                    <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity order-1">
-                        <span class="text-2xl">🍯</span>
-                        <span
-                            class="text-xl font-bold bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Honeypot</span>
+                    <a href="/" class="flex items-center gap-2.5 hover:opacity-85 transition-opacity order-1">
+                        <svg class="w-7 h-7 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="hp-logo-grad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stop-color="#fbbf24"/>
+                                    <stop offset="55%" stop-color="#f59e0b"/>
+                                    <stop offset="100%" stop-color="#ea580c"/>
+                                </linearGradient>
+                            </defs>
+                            <polygon points="16,4.6 21.72,7.9 21.72,14.5 16,17.8 10.28,14.5 10.28,7.9" fill="none" stroke="url(#hp-logo-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+                            <polygon points="10.28,14.5 16,17.8 16,24.4 10.28,27.7 4.56,24.4 4.56,17.8" fill="none" stroke="url(#hp-logo-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+                            <polygon points="21.72,14.5 27.44,17.8 27.44,24.4 21.72,27.7 16,24.4 16,17.8" fill="none" stroke="url(#hp-logo-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+                            <polygon points="16,13.2 19.98,15.5 19.98,20.1 16,22.4 12.02,20.1 12.02,15.5" fill="url(#hp-logo-grad)"/>
+                        </svg>
+                        <span class="text-xl font-bold tracking-tight text-white">Honeypot</span>
                     </a>
 
                     <button id="themeToggle"
-                        class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl order-2 sm:order-3"
-                        title="Toggle theme">🌙</button>
+                        class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-800 text-gray-400 hover:text-gray-100 hover:bg-gray-800 transition-colors order-2 sm:order-3"
+                        aria-label="Toggle theme" title="Toggle theme">
+                        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+                        </svg>
+                    </button>
 
                     <!-- Row 2 on mobile: Navigation -->
                     <nav class="flex items-center gap-2 order-3 sm:order-2 w-full sm:w-auto">
                         <a href="/"
-                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors">Dashboard</a>
+                            class="nav-active px-3 sm:px-4 py-2 rounded-lg text-sm font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 transition-colors">Dashboard</a>
                         <a href="/stats"
-                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors">Statistics</a>
+                            class="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800/70 transition-colors">Statistics</a>
                     </nav>
                 </div>
             </div>
@@ -76,7 +91,7 @@
 
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6 flex flex-col justify-between">
+                <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6 flex flex-col justify-between">
                     <div>
                         <div class="flex items-start justify-between gap-2">
                             <div id="monthlyRequests" class="text-3xl font-bold text-white tabular-nums">-</div>
@@ -100,14 +115,26 @@
                         </div>
                     </div>
                 </div>
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <div class="text-gray-500 text-sm font-medium mb-2">🔐 Recent Credentials</div>
+                <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div class="flex items-center gap-2 text-gray-400 text-sm font-medium mb-3">
+                        <svg class="w-4 h-4 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/>
+                            <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+                        </svg>
+                        <span>Recent Credentials</span>
+                    </div>
                     <div id="recentCredentials" class="space-y-1 font-mono text-sm max-h-40 overflow-y-auto">
                         <div class="text-gray-600">-</div>
                     </div>
                 </div>
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <div class="text-gray-500 text-sm font-medium mb-2">💻 Recent Commands</div>
+                <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl p-6">
+                    <div class="flex items-center gap-2 text-gray-400 text-sm font-medium mb-3">
+                        <svg class="w-4 h-4 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="4 17 10 11 4 5"/>
+                            <line x1="12" x2="20" y1="19" y2="19"/>
+                        </svg>
+                        <span>Recent Commands</span>
+                    </div>
                     <div id="recentCommands" class="space-y-1 font-mono text-sm max-h-40 overflow-y-auto">
                         <div class="text-gray-600">-</div>
                     </div>
@@ -116,7 +143,7 @@
 
 
             <!-- Live Feed -->
-            <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+            <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
                     <div class="flex items-center gap-3">
                         <h3 class="text-lg font-semibold text-white">Live Request Feed</h3>
@@ -128,16 +155,29 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <button id="pauseBtn"
-                            class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
-                            title="Pause">⏸</button>
+                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-800 hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+                            aria-label="Pause feed" title="Pause">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="14" y="4" width="4" height="16" rx="1"/>
+                                <rect x="6" y="4" width="4" height="16" rx="1"/>
+                            </svg>
+                        </button>
                         <button id="clearBtn"
-                            class="p-2 rounded-lg hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
-                            title="Clear">🗑</button>
+                            class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-gray-800 hover:bg-gray-800 transition-colors text-gray-400 hover:text-white"
+                            aria-label="Clear feed" title="Clear">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 6h18"/>
+                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                <line x1="10" x2="10" y1="11" y2="17"/>
+                                <line x1="14" x2="14" y1="11" y2="17"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto max-h-[30rem] overflow-y-auto">
                     <table class="w-full">
-                        <thead class="bg-gray-800/50">
+                        <thead class="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800">
                             <tr class="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                                 <th class="px-6 py-3">Time</th>
                                 <th class="px-6 py-3">IP</th>
@@ -154,7 +194,7 @@
             </div>
 
             <!-- Request Map -->
-            <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
+            <div class="bg-gray-900/60 backdrop-blur border border-gray-800 rounded-xl overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-800">
                     <h3 class="text-lg font-semibold text-white">Live Request Map</h3>
                 </div>
@@ -169,12 +209,15 @@
                 class="modal bg-gradient-to-b from-gray-900 to-gray-950 border border-gray-700/50 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden m-4 transform scale-95 transition-transform duration-300 shadow-2xl">
 
                 <!-- Modal Header -->
-                <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800/50 bg-gray-900/50">
+                <div class="modal-header flex items-center justify-between px-6 py-4 border-b border-gray-800/50 bg-gray-900/50">
                     <div class="flex items-center gap-3">
-                        <span class="text-xl">🔍</span>
+                        <svg class="w-[18px] h-[18px] text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="m21 21-4.3-4.3"/>
+                        </svg>
                         <h3 class="text-lg font-semibold text-white">Request Details</h3>
                     </div>
-                    <button id="modalClose"
+                    <button id="modalClose" aria-label="Close modal"
                         class="p-2 rounded-lg hover:bg-gray-700 transition-colors text-gray-400 hover:text-white">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -237,9 +280,12 @@
 
                     <!-- Credentials (if present) -->
                     <div id="credentialsRow" class="hidden">
-                        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                        <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 w-full">
                             <div class="flex items-center gap-2 mb-2">
-                                <span class="text-amber-400">🔐</span>
+                                <svg class="w-4 h-4 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/>
+                                    <circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>
+                                </svg>
                                 <span class="text-xs text-amber-400 uppercase tracking-wide font-medium">Captured
                                     Credentials</span>
                             </div>
@@ -250,7 +296,12 @@
                     <!-- Request/Headers -->
                     <div>
                         <div class="flex items-center gap-2 mb-3">
-                            <span class="text-cyan-400">📨</span>
+                            <svg class="w-4 h-4 text-cyan-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <path d="m10 13-2 2 2 2"/>
+                                <path d="m14 17 2-2-2-2"/>
+                            </svg>
                             <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Request /
                                 Headers</span>
                         </div>
@@ -261,18 +312,26 @@
                     <!-- Payload -->
                     <div id="payloadSection" class="hidden">
                         <div class="flex items-center gap-2 mb-3">
-                            <span class="text-green-400">📦</span>
+                            <svg class="w-4 h-4 text-emerald-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                                <path d="m3.3 7 8.7 5 8.7-5"/>
+                                <path d="M12 22V12"/>
+                            </svg>
                             <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Body /
                                 Payload</span>
                         </div>
                         <pre id="detailPayload"
-                            class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm font-mono text-green-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin">No payload</pre>
+                            class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm font-mono text-emerald-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin">No payload</pre>
                     </div>
 
                     <!-- Extracted IOCs -->
                     <div id="iocsSection" class="hidden">
                         <div class="flex items-center gap-2 mb-3">
-                            <span class="text-red-400">🚨</span>
+                            <svg class="w-4 h-4 text-red-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+                                <path d="M12 8v4"/>
+                                <path d="M12 16h.01"/>
+                            </svg>
                             <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Extracted IOCs
                                 (Defanged)</span>
                         </div>

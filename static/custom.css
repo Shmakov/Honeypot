@@ -148,6 +148,45 @@
     font-family: inherit;
 }
 
+/* Dark theme Leaflet zoom & attribution controls */
+.leaflet-bar {
+    border: 1px solid #1f2937 !important;
+    border-radius: 0.5rem !important;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+}
+
+.leaflet-bar a,
+.leaflet-bar a:visited {
+    background-color: #111827 !important;
+    color: #e5e7eb !important;
+    border-bottom: 1px solid #1f2937 !important;
+    width: 30px !important;
+    height: 30px !important;
+    line-height: 30px !important;
+}
+
+.leaflet-bar a:last-child {
+    border-bottom: none !important;
+}
+
+.leaflet-bar a:hover {
+    background-color: #1f2937 !important;
+    color: #ffffff !important;
+}
+
+.leaflet-control-attribution {
+    background: rgba(17, 24, 39, 0.82) !important;
+    color: #9ca3af !important;
+    border-top-left-radius: 6px;
+    padding: 2px 6px !important;
+    font-size: 11px !important;
+}
+
+.leaflet-control-attribution a {
+    color: #d1d5db !important;
+}
+
 .leaflet-popup-content-wrapper {
     background: #1f2937;
     color: #f9fafb;
@@ -530,25 +569,28 @@
 }
 
 /* Accent colors - MUCH darker for light mode visibility */
-/* Amber for usernames - dark gold */
-[data-theme="light"] [class*="text-amber-400"] {
+/* Amber for usernames & brand highlights - dark gold */
+[data-theme="light"] [class*="text-amber-400"],
+[data-theme="light"] [class*="text-amber-300"] {
     color: #b45309 !important;
 }
 
-/* Red for passwords - dark red */
-[data-theme="light"] [class*="text-red-400"] {
-    color: #c53030 !important;
+/* Red for passwords & IOCs - dark red */
+[data-theme="light"] [class*="text-red-400"],
+[data-theme="light"] [class*="text-red-300"] {
+    color: #b91c1c !important;
 }
 
 /* Blue for paths - dark blue */
 [data-theme="light"] [class*="text-blue-400"] {
-    color: #2b6cb0 !important;
+    color: #1d4ed8 !important;
 }
 
-/* Green for success - dark green */
+/* Green / Emerald for success & payload - dark green */
 [data-theme="light"] [class*="text-green-400"],
-[data-theme="light"] [class*="text-green-500"] {
-    color: #276749 !important;
+[data-theme="light"] [class*="text-green-500"],
+[data-theme="light"] [class*="text-emerald-400"] {
+    color: #047857 !important;
 }
 
 /* Purple for telnet badges */
@@ -556,9 +598,51 @@
     color: #6b46c1 !important;
 }
 
-/* Cyan for mysql badges */
+/* Cyan for mysql badges & commands */
 [data-theme="light"] [class*="text-cyan-400"] {
     color: #0e7490 !important;
+}
+
+/* Avoid card shadows on inner sticky headers, modals, and segmented controls */
+[data-theme="light"] thead[class*="bg-gray-900"],
+[data-theme="light"] .modal-header,
+[data-theme="light"] #timeRangeGroup {
+    box-shadow: none !important;
+}
+
+[data-theme="light"] nav a:not(.nav-active) {
+    background-color: transparent !important;
+    color: #475569 !important;
+}
+
+[data-theme="light"] nav a:not(.nav-active):hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] thead[class*="bg-gray-900"] {
+    background-color: #f8fafc !important;
+}
+
+[data-theme="light"] #timeRangeGroup {
+    background-color: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .nav-active,
+[data-theme="light"] .time-range-btn.active {
+    background-color: rgba(245, 158, 11, 0.14) !important;
+    color: #b45309 !important;
+    border-color: rgba(217, 119, 6, 0.32) !important;
+}
+
+[data-theme="light"] .time-range-btn:not(.active):hover {
+    background-color: rgba(255, 255, 255, 0.75) !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .time-range-btn.active:hover {
+    background-color: rgba(245, 158, 11, 0.2) !important;
 }
 
 /* Dividers */
@@ -597,6 +681,32 @@
     background: #ffffff !important;
 }
 
+[data-theme="light"] .leaflet-bar {
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="light"] .leaflet-bar a,
+[data-theme="light"] .leaflet-bar a:visited {
+    background-color: #ffffff !important;
+    color: #334155 !important;
+    border-bottom-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] .leaflet-bar a:hover {
+    background-color: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .leaflet-control-attribution {
+    background: rgba(255, 255, 255, 0.88) !important;
+    color: #64748b !important;
+}
+
+[data-theme="light"] .leaflet-control-attribution a {
+    color: #334155 !important;
+}
+
 /* Modal - white with shadow */
 [data-theme="light"] .modal {
     background: linear-gradient(to bottom, #ffffff, #fafbfc) !important;
@@ -618,11 +728,6 @@
 /* Code text in pre - darker green for readability */
 [data-theme="light"] pre [class*="text-green-400"] {
     color: #276749 !important;
-}
-
-/* Font mono elements */
-[data-theme="light"] .font-mono {
-    color: #2d3748 !important;
 }
 
 /* Scrollbar styling */

@@ -1,12 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
-  <!-- Background -->
-  <rect width="180" height="180" rx="40" fill="#1a1a2e"/>
-  <!-- Honey pot body -->
-  <path d="M50 80 L50 130 Q50 155 90 155 Q130 155 130 130 L130 80 Z" fill="#f59e0b"/>
-  <!-- Pot rim -->
-  <rect x="40" y="68" width="100" height="18" rx="6" fill="#fcd34d"/>
-  <!-- Honey drip top -->
-  <ellipse cx="90" cy="55" rx="40" ry="18" fill="#fcd34d"/>
-  <!-- Highlight -->
-  <ellipse cx="65" cy="105" rx="12" ry="20" fill="#fcd34d" opacity="0.4"/>
+  <defs>
+    <linearGradient id="hp-touch-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="55%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="180" rx="40" fill="#0d1117"/>
+  <g transform="translate(90 90) scale(4.7) translate(-16 -16.15)">
+    <polygon points="16,4.6 21.72,7.9 21.72,14.5 16,17.8 10.28,14.5 10.28,7.9" fill="none" stroke="url(#hp-touch-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+    <polygon points="10.28,14.5 16,17.8 16,24.4 10.28,27.7 4.56,24.4 4.56,17.8" fill="none" stroke="url(#hp-touch-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+    <polygon points="21.72,14.5 27.44,17.8 27.44,24.4 21.72,27.7 16,24.4 16,17.8" fill="none" stroke="url(#hp-touch-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+    <polygon points="16,13.2 19.98,15.5 19.98,20.1 16,22.4 12.02,20.1 12.02,15.5" fill="url(#hp-touch-grad)"/>
+  </g>
 </svg>

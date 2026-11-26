@@ -438,10 +438,21 @@ class HoneypotDashboard {
     }
 
     setupEventListeners() {
+        const pauseBtn = document.getElementById('pauseBtn');
+        const PAUSE_ICON = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>';
+        const PLAY_ICON = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>';
+
         // Pause button
-        document.getElementById('pauseBtn').addEventListener('click', () => {
+        pauseBtn.addEventListener('click', () => {
             this.isPaused = !this.isPaused;
-            document.getElementById('pauseBtn').textContent = this.isPaused ? '▶' : '⏸';
+            pauseBtn.innerHTML = this.isPaused ? PLAY_ICON : PAUSE_ICON;
+            pauseBtn.setAttribute('title', this.isPaused ? 'Resume' : 'Pause');
+            pauseBtn.setAttribute('aria-label', this.isPaused ? 'Resume feed' : 'Pause feed');
+            pauseBtn.classList.toggle('text-amber-400', this.isPaused);
+            pauseBtn.classList.toggle('border-amber-500/40', this.isPaused);
+            pauseBtn.classList.toggle('bg-amber-500/10', this.isPaused);
+            pauseBtn.classList.toggle('text-gray-400', !this.isPaused);
+            pauseBtn.classList.toggle('border-gray-800', !this.isPaused);
         });
 
         // Clear button
