@@ -37,10 +37,18 @@ pub struct DatabaseConfig {
     /// shared cache across all pool connections. Set based on available server memory.
     #[serde(default = "default_cache_size_mb")]
     pub cache_size_mb: u32,
+    /// Days to retain raw rows in `requests` before pruning (default: 30; 0 disables pruning).
+    /// Daily summaries in `stats_daily` are always kept indefinitely.
+    #[serde(default = "default_retention_days")]
+    pub retention_days: u32,
 }
 
 fn default_cache_size_mb() -> u32 {
     16
+}
+
+fn default_retention_days() -> u32 {
+    30
 }
 
 fn default_max_ports() -> usize {
@@ -165,6 +173,7 @@ mysql_version = "5.7"
 "#;
 
         std::env::set_var("HONEYPOT_MAP__CARTO_API_KEY", "test_key_123");
+        std::env::set_var("HONEYPOT_DATABASE__RETENTION_DAYS", "45");
         let settings = config::Config::builder()
             .add_source(config::File::from_str(minimal_toml, config::FileFormat::Toml))
             .add_source(
@@ -174,9 +183,18 @@ mysql_version = "5.7"
             )
             .build()
             .unwrap();
+        let cfg_default_check: Config = config::Config::builder()
+            .add_source(config::File::from_str(minimal_toml, config::FileFormat::Toml))
+            .build()
+            .unwrap()
+            .try_deserialize()
+            .unwrap();
         let cfg: Config = settings.try_deserialize().unwrap();
         std::env::remove_var("HONEYPOT_MAP__CARTO_API_KEY");
+        std::env::remove_var("HONEYPOT_DATABASE__RETENTION_DAYS");
 
+        assert_eq!(cfg_default_check.database.retention_days, 30);
+        assert_eq!(cfg.database.retention_days, 45);
         assert_eq!(cfg.map.carto_api_key, "test_key_123");
     }
 }

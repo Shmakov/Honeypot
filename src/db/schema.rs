@@ -54,16 +54,16 @@ pub const CREATE_INDEX_TS_HTTP_PATH: &str =
 pub const CREATE_INDEX_TS_LOCATION: &str = 
     "CREATE INDEX IF NOT EXISTS idx_ts_location ON requests(timestamp, latitude, longitude)";
 
-// === UTILITY INDEXES ===
-
-// For IP lookups and deduplication
-pub const CREATE_INDEX_IP: &str = 
-    "CREATE INDEX IF NOT EXISTS idx_requests_ip ON requests(ip)";
-
-// For credential queries (ORDER BY id DESC with username filter)
-pub const CREATE_INDEX_CREDENTIALS: &str = 
-    "CREATE INDEX IF NOT EXISTS idx_credentials ON requests(username, id DESC) WHERE username IS NOT NULL";
-
 // For IP-based queries (top IPs by requests/bandwidth)
 pub const CREATE_INDEX_TS_IP: &str = 
     "CREATE INDEX IF NOT EXISTS idx_ts_ip ON requests(timestamp, ip)";
+
+// Unused or redundant legacy indexes to drop on migration:
+// - idx_requests_location: duplicate of idx_ts_location
+// - idx_requests_ip: no query filters by ip without timestamp
+// - idx_credentials: unused by ORDER BY id DESC and misleads SQLite's query planner
+pub const DROP_UNUSED_INDEXES: &[&str] = &[
+    "DROP INDEX IF EXISTS idx_requests_location",
+    "DROP INDEX IF EXISTS idx_requests_ip",
+    "DROP INDEX IF EXISTS idx_credentials",
+];

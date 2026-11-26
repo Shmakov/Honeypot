@@ -22,6 +22,8 @@ url = "honeypot.db"
 # SQLite page cache in MB (default: 16). With cache=shared, this is the total
 # shared cache across all pool connections. Set based on available server memory.
 # cache_size_mb = 16
+# Raw request retention in days (default: 30; 0 disables pruning). Daily rollups are kept forever.
+retention_days = 30
 
 # GeoIP database path (MaxMind GeoLite2-City.mmdb)
 [geoip]

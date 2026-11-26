@@ -79,8 +79,8 @@ async fn main() -> Result<()> {
     });
     info!("Protocol handlers starting...");
 
-    // Start background tasks for rollup aggregation
-    web::start_background_tasks(db_arc);
+    // Start background tasks for rollup aggregation and retention pruning
+    web::start_background_tasks(db_arc, config.database.retention_days);
 
     // Warm the cache in the background so the web server binds immediately
     let warm_db = db.clone();

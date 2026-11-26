@@ -229,9 +229,9 @@ pub async fn warm_cache(db: &Database) {
     tracing::info!("Cache warmed successfully");
 }
 
-/// Run daily rollup backfill and start background aggregation task
-pub fn start_background_tasks(db: Arc<Database>) {
-    // Backfill any missing days first
+/// Run daily rollup backfill, retention pruning, and start background aggregation task
+pub fn start_background_tasks(db: Arc<Database>, retention_days: u32) {
+    // Backfill any missing days first, then prune expired raw rows
     tokio::spawn({
         let db = db.clone();
         async move {
@@ -253,15 +253,38 @@ pub fn start_background_tasks(db: Arc<Database>) {
                     tracing::warn!("Failed to check rollup status: {}", e);
                 }
             }
+
+            if retention_days > 0 {
+                match db.prune_old_requests(retention_days).await {
+                    Ok(deleted) if deleted > 0 => {
+                        tracing::info!(
+                            "Pruned {} raw request rows older than {} days",
+                            deleted,
+                            retention_days
+                        );
+                    }
+                    Ok(_) => {
+                        tracing::info!(
+                            "No raw request rows older than {} days to prune",
+                            retention_days
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to prune old requests: {}", e);
+                    }
+                }
+            }
         }
     });
     
-    // Start periodic rollup check (every hour, aggregate yesterday if not done)
-    // The aggregate_day function checks if already done, so this is cheap
+    // Start periodic rollup and pruning check (every hour)
+    // aggregate_day and prune_old_requests are cheap no-ops when up to date
     tokio::spawn({
         let db = db.clone();
         async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+            // Skip immediate first tick so startup backfill+prune handles the initial pass
+            interval.tick().await;
             loop {
                 interval.tick().await;
                 
@@ -274,6 +297,22 @@ pub fn start_background_tasks(db: Arc<Database>) {
                 
                 if let Err(e) = db.aggregate_day(yesterday).await {
                     tracing::debug!("Hourly rollup check: {}", e);
+                }
+
+                if retention_days > 0 {
+                    match db.prune_old_requests(retention_days).await {
+                        Ok(deleted) if deleted > 0 => {
+                            tracing::info!(
+                                "Hourly prune removed {} raw request rows older than {} days",
+                                deleted,
+                                retention_days
+                            );
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            tracing::warn!("Hourly prune failed: {}", e);
+                        }
+                    }
                 }
                 
                 tracing::debug!("Hourly rollup check complete");

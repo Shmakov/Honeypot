@@ -124,6 +124,11 @@ impl Database {
     }
 
     pub async fn run_migrations(&self) -> Result<()> {
+        // Enable incremental auto-vacuum on new databases (existing DBs pick it up after VACUUM)
+        sqlx::query("PRAGMA auto_vacuum = INCREMENTAL")
+            .execute(&self.pool)
+            .await?;
+
         // Enable WAL mode for better concurrency (persists at database level)
         sqlx::query("PRAGMA journal_mode=WAL")
             .execute(&self.pool)
@@ -152,15 +157,16 @@ impl Database {
         sqlx::query(schema::CREATE_INDEX_TS_LOCATION)
             .execute(&self.pool)
             .await?;
-        sqlx::query(schema::CREATE_INDEX_IP)
-            .execute(&self.pool)
-            .await?;
-        sqlx::query(schema::CREATE_INDEX_CREDENTIALS)
-            .execute(&self.pool)
-            .await?;
         sqlx::query(schema::CREATE_INDEX_TS_IP)
             .execute(&self.pool)
             .await?;
+
+        // Drop unused or redundant legacy indexes
+        for stmt in schema::DROP_UNUSED_INDEXES {
+            sqlx::query(stmt)
+                .execute(&self.pool)
+                .await?;
+        }
         
         Ok(())
     }
@@ -233,12 +239,22 @@ impl Database {
 
     // ==================== BASIC READ OPERATIONS ====================
 
-    /// Get total request count using MAX(rowid) for O(1) performance.
+    /// Get total request count using MAX(rowid) for O(1) performance,
+    /// falling back to sqlite_sequence if all rows in `requests` were pruned.
     pub async fn get_total_count(&self) -> Result<i64> {
         let row: (Option<i64>,) = sqlx::query_as("SELECT MAX(rowid) FROM requests")
             .fetch_one(&self.pool)
             .await?;
-        Ok(row.0.unwrap_or(0))
+        if let Some(max_id) = row.0 {
+            return Ok(max_id);
+        }
+
+        let seq: Option<(i64,)> =
+            sqlx::query_as("SELECT seq FROM sqlite_sequence WHERE name = 'requests'")
+                .fetch_optional(&self.pool)
+                .await
+                .unwrap_or(None);
+        Ok(seq.map(|(s,)| s).unwrap_or(0))
     }
 
     pub async fn get_recent_credentials(&self, limit: i32) -> Result<Vec<(String, String)>> {
@@ -963,6 +979,62 @@ impl Database {
 
         Ok(missing)
     }
+
+    /// Prune raw `requests` rows older than `retention_days` in small batches.
+    /// Never deletes rows for days that have not yet been rolled up into `stats_daily`.
+    pub async fn prune_old_requests(&self, retention_days: u32) -> Result<u64> {
+        if retention_days == 0 {
+            return Ok(0);
+        }
+
+        const DAY_MS: i64 = 86_400_000;
+        const BATCH_SIZE: i64 = 5_000;
+
+        let today_start = {
+            let now = Utc::now();
+            Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
+                .unwrap()
+                .timestamp_millis()
+        };
+        let cutoff_ts = today_start - (retention_days as i64) * DAY_MS;
+
+        // Safety guard: never delete data for days that haven't been rolled up yet
+        let unrolled_days = self.get_days_needing_rollup().await?;
+        let safe_cutoff = unrolled_days
+            .into_iter()
+            .min()
+            .map(|d| d.min(cutoff_ts))
+            .unwrap_or(cutoff_ts);
+
+        let mut total_deleted: u64 = 0;
+        loop {
+            let result = sqlx::query(
+                "DELETE FROM requests WHERE id IN (SELECT id FROM requests WHERE timestamp < ? LIMIT ?)"
+            )
+            .bind(safe_cutoff)
+            .bind(BATCH_SIZE)
+            .execute(&self.pool)
+            .await?;
+
+            let deleted = result.rows_affected();
+            total_deleted += deleted;
+
+            if deleted < BATCH_SIZE as u64 {
+                break;
+            }
+
+            // Yield briefly between batches so live writes and queries are never starved
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+
+        if total_deleted > 0 {
+            let _ = sqlx::query("PRAGMA incremental_vacuum(1000)")
+                .execute(&self.pool)
+                .await;
+        }
+
+        Ok(total_deleted)
+    }
 }
 
 // ==================== HELPER STRUCTS ====================
@@ -1102,6 +1174,7 @@ mod tests {
             driver: "sqlite".to_string(),
             url: path.to_string_lossy().into_owned(),
             cache_size_mb: 16,
+            retention_days: 30,
         };
         let db = Database::new(&cfg).await.unwrap();
         db.run_migrations().await.unwrap();
@@ -1225,6 +1298,101 @@ mod tests {
             plan_text.contains("timestamp"),
             "Query plan should filter using a timestamp index: {}",
             plan_text
+        );
+    }
+
+    #[tokio::test]
+    async fn test_prune_old_requests_respects_rollup_and_preserves_total_count() {
+        const DAY_MS: i64 = 86_400_000;
+        let tmp = setup_temp_db().await;
+        let db = &tmp.db;
+
+        // Brand-new empty DB returns 0 even before sqlite_sequence exists
+        assert_eq!(db.get_total_count().await.unwrap(), 0);
+
+        let today_start = {
+            let now = Utc::now();
+            Utc.with_ymd_and_hms(now.year(), now.month(), now.day(), 0, 0, 0)
+                .unwrap()
+                .timestamp_millis()
+        };
+
+        let day_40 = today_start - 40 * DAY_MS;
+        let day_35 = today_start - 35 * DAY_MS;
+        let day_5 = today_start - 5 * DAY_MS;
+
+        insert_request(db, day_40 + 1000, "ssh", None, None).await;
+        insert_request(db, day_35 + 1000, "ssh", None, None).await;
+        insert_request(db, day_5 + 1000, "ssh", None, None).await;
+        assert_eq!(db.get_total_count().await.unwrap(), 3);
+
+        // retention_days = 0 disables pruning
+        assert_eq!(db.prune_old_requests(0).await.unwrap(), 0);
+
+        // Neither day_40 nor day_35 is rolled up yet -> safety guard deletes 0 rows
+        assert_eq!(db.prune_old_requests(30).await.unwrap(), 0);
+
+        // Roll up only day_40 -> only day_40 is pruned; day_35 stays protected
+        db.aggregate_day(day_40).await.unwrap();
+        assert_eq!(db.prune_old_requests(30).await.unwrap(), 1);
+        let (remaining,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM requests")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(remaining, 2);
+
+        // Roll up day_35 -> day_35 is pruned; day_5 stays within 30-day window
+        db.aggregate_day(day_35).await.unwrap();
+        assert_eq!(db.prune_old_requests(30).await.unwrap(), 1);
+        let (remaining,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM requests")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(remaining, 1);
+
+        // Roll up day_5 and prune with 1-day retention -> requests becomes empty,
+        // but get_total_count() preserves the AUTOINCREMENT high-water mark via sqlite_sequence
+        db.aggregate_day(day_5).await.unwrap();
+        assert_eq!(db.prune_old_requests(1).await.unwrap(), 1);
+        let (remaining,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM requests")
+            .fetch_one(&db.pool)
+            .await
+            .unwrap();
+        assert_eq!(remaining, 0);
+        assert_eq!(db.get_total_count().await.unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_migrations_drop_unused_indexes() {
+        let tmp = setup_temp_db().await;
+        let db = &tmp.db;
+
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_requests_location ON requests(timestamp, latitude, longitude)")
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_requests_ip ON requests(ip)")
+            .execute(&db.pool)
+            .await
+            .unwrap();
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_credentials ON requests(username, id DESC) WHERE username IS NOT NULL")
+            .execute(&db.pool)
+            .await
+            .unwrap();
+
+        db.run_migrations().await.unwrap();
+
+        let legacy_indexes: Vec<(String,)> = sqlx::query_as(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_requests_location', 'idx_requests_ip', 'idx_credentials')",
+        )
+        .fetch_all(&db.pool)
+        .await
+        .unwrap();
+
+        assert!(
+            legacy_indexes.is_empty(),
+            "Expected legacy indexes to be dropped, found: {:?}",
+            legacy_indexes
         );
     }
 }
