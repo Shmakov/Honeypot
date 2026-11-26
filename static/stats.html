@@ -303,7 +303,7 @@
                         class="px-3 py-1 rounded-full text-xs font-medium bg-gray-800 text-gray-400">-</span>
                 </div>
 
-                <!-- Tags & Targeted Ports -->
+                <!-- Tags & ASNs -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
                         <h3 class="text-lg font-semibold text-white mb-4">Top Attack Tags</h3>
@@ -312,15 +312,15 @@
                         </div>
                     </div>
                     <div class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl p-6">
-                        <h3 class="text-lg font-semibold text-white mb-4">Top Targeted Ports</h3>
-                        <div id="portsChart" class="h-64 overflow-y-auto space-y-1 pr-2">
+                        <h3 class="text-lg font-semibold text-white mb-4">Top ASNs / Networks</h3>
+                        <div id="asnsChart" class="h-64 overflow-y-auto space-y-1 pr-2">
                             <div class="text-gray-500 text-center py-8">Loading...</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Commands, User-Agents & ASNs -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Commands & User-Agents -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div
                         class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
                         <div class="px-6 py-4 border-b border-gray-800">
@@ -355,25 +355,6 @@
                                     </tr>
                                 </thead>
                                 <tbody id="userAgentsTable" class="divide-y divide-gray-800/50"></tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <div
-                        class="bg-gradient-to-br from-gray-900 to-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden">
-                        <div class="px-6 py-4 border-b border-gray-800">
-                            <h3 class="text-lg font-semibold text-white">Top ASNs / Networks</h3>
-                            <p class="text-xs text-gray-500 mt-1">Autonomous systems</p>
-                        </div>
-                        <div class="overflow-x-auto overflow-y-auto max-h-72">
-                            <table class="w-full">
-                                <thead class="bg-gray-800/30">
-                                    <tr class="text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <th class="px-5 py-3">ASN / Organization</th>
-                                        <th class="px-5 py-3 text-right">Count</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="asnsTable" class="divide-y divide-gray-800/50"></tbody>
                             </table>
                         </div>
                     </div>

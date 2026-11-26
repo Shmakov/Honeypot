@@ -499,16 +499,15 @@ class StatsPage {
         );
 
         this.renderBarList(
-            'portsChart',
-            (intel.ports || []).map(p => ({ labelHtml: `Port <span class="font-mono">${this.escapeHtml(p.name)}</span>`, count: p.count })),
-            '🔌',
-            'No port data available',
-            ['6, 182, 212', '59, 130, 246']
+            'asnsChart',
+            (intel.asns || []).map(a => ({ labelHtml: this.escapeHtml(a.name), count: a.count })),
+            '🌐',
+            'No ASN data captured yet',
+            ['139, 92, 246', '99, 102, 241']
         );
 
         this.renderSimpleCountTable('commandsTable', intel.commands, 'No shell commands captured', 'text-cyan-400 font-mono');
         this.renderSimpleCountTable('userAgentsTable', intel.user_agents, 'No client banners captured', 'text-gray-300 font-mono');
-        this.renderSimpleCountTable('asnsTable', intel.asns, 'Add GeoLite2-ASN.mmdb to enable ASN lookup', 'text-purple-400');
 
         const iocsBody = document.getElementById('iocsTable');
         if (iocsBody) {
