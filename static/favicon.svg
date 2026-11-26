@@ -1,16 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .s1 { stop-color: #fbbf24; }
+    .s2 { stop-color: #f59e0b; }
+    .s3 { stop-color: #ea580c; }
+    @media (prefers-color-scheme: light) {
+      .s1 { stop-color: #f59e0b; }
+      .s2 { stop-color: #d97706; }
+      .s3 { stop-color: #c2410c; }
+    }
+  </style>
   <defs>
     <linearGradient id="hp-favicon-grad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#fbbf24"/>
-      <stop offset="55%" stop-color="#f59e0b"/>
-      <stop offset="100%" stop-color="#ea580c"/>
+      <stop offset="0%" class="s1"/>
+      <stop offset="55%" class="s2"/>
+      <stop offset="100%" class="s3"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="7" fill="#0d1117"/>
-  <g transform="translate(16 16) scale(0.84) translate(-16 -16.15)">
-    <polygon points="16,4.6 21.72,7.9 21.72,14.5 16,17.8 10.28,14.5 10.28,7.9" fill="none" stroke="url(#hp-favicon-grad)" stroke-width="2.1" stroke-linejoin="round"/>
-    <polygon points="10.28,14.5 16,17.8 16,24.4 10.28,27.7 4.56,24.4 4.56,17.8" fill="none" stroke="url(#hp-favicon-grad)" stroke-width="2.1" stroke-linejoin="round"/>
-    <polygon points="21.72,14.5 27.44,17.8 27.44,24.4 21.72,27.7 16,24.4 16,17.8" fill="none" stroke="url(#hp-favicon-grad)" stroke-width="2.1" stroke-linejoin="round"/>
+  <g transform="translate(16 16) scale(1.06) translate(-16 -16.15)">
+    <polygon points="16,4.6 21.72,7.9 21.72,14.5 16,17.8 10.28,14.5 10.28,7.9" fill="none" stroke="url(#hp-favicon-grad)" stroke-width="2.3" stroke-linejoin="round"/>
+    <polygon points="10.28,14.5 16,17.8 16,24.4 10.28,27.7 4.56,24.4 4.56,17.8" fill="none" stroke="url(#hp-favicon-grad)" stroke-width="2.3" stroke-linejoin="round"/>
+    <polygon points="21.72,14.5 27.44,17.8 27.44,24.4 21.72,27.7 16,24.4 16,17.8" fill="none" stroke="url(#hp-favicon-grad)" stroke-width="2.3" stroke-linejoin="round"/>
     <polygon points="16,13.2 19.98,15.5 19.98,20.1 16,22.4 12.02,20.1 12.02,15.5" fill="url(#hp-favicon-grad)"/>
   </g>
 </svg>
