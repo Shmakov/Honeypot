@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info};
 
-use russh::server::{Auth, Config, Handler, Msg, Server, Session};
-use russh::{Channel, ChannelId, Pty};
+use russh::server::{Auth, ChannelOpenHandle, Config, Handler, Msg, PublicKeyOffer, Server, Session, VerifiedPublicKey};
+use russh::{Channel, ChannelId, ChannelOpenFailure, Pty};
 use russh::keys::{HashAlg, PrivateKey};
 
 use crate::config::Config as AppConfig;
@@ -234,11 +234,11 @@ impl Handler for SshSession {
     type Error = anyhow::Error;
 
     /// Accept password authentication - capture credentials
-    fn auth_password(
+    async fn auth_password(
         &mut self,
         user: &str,
         password: &str,
-    ) -> impl std::future::Future<Output = Result<Auth, Self::Error>> + Send {
+    ) -> Result<Auth, Self::Error> {
         debug!("SSH auth_password: {}:{} from {}", user, password, self.ip);
         
         self.username = Some(user.to_string());
@@ -248,14 +248,14 @@ impl Handler for SshSession {
         self.log_auth_event(user, &format!("{}:{}", user, password));
         
         // Accept authentication - this is a honeypot!
-        std::future::ready(Ok(Auth::Accept))
+        Ok(Auth::Accept)
     }
 
     /// Accept "none" authentication
-    fn auth_none(
+    async fn auth_none(
         &mut self,
         user: &str,
-    ) -> impl std::future::Future<Output = Result<Auth, Self::Error>> + Send {
+    ) -> Result<Auth, Self::Error> {
         debug!("SSH auth_none from {} as '{}'", self.ip, user);
         self.username = Some(user.to_string());
         self.auth_method = Some("none".to_string());
@@ -263,16 +263,16 @@ impl Handler for SshSession {
         self.log_auth_event(user, user);
         
         // Accept - let them in!
-        std::future::ready(Ok(Auth::Accept))
+        Ok(Auth::Accept)
     }
 
     /// Accept public key authentication - log the key fingerprint
-    fn auth_publickey(
+    async fn auth_publickey(
         &mut self,
         user: &str,
-        public_key: &russh::keys::PublicKey,
-    ) -> impl std::future::Future<Output = Result<Auth, Self::Error>> + Send {
-        let fingerprint = public_key.fingerprint(HashAlg::Sha256);
+        key: VerifiedPublicKey<'_>,
+    ) -> Result<Auth, Self::Error> {
+        let fingerprint = key.public_key.fingerprint(HashAlg::Sha256);
         debug!("SSH auth_publickey from {} as '{}' with key {}", self.ip, user, fingerprint);
         
         self.username = Some(user.to_string());
@@ -281,40 +281,43 @@ impl Handler for SshSession {
         self.log_auth_event(user, &format!("{}@{}", user, fingerprint));
         
         // Accept public key auth
-        std::future::ready(Ok(Auth::Accept))
+        Ok(Auth::Accept)
     }
 
     /// Accept public key offer (pre-signature check)
-    fn auth_publickey_offered(
+    async fn auth_publickey_offered(
         &mut self,
         user: &str,
-        public_key: &russh::keys::PublicKey,
-    ) -> impl std::future::Future<Output = Result<Auth, Self::Error>> + Send {
-        debug!("SSH publickey offered from {} as '{}': {}", self.ip, user, public_key.fingerprint(HashAlg::Sha256));
+        offer: PublicKeyOffer<'_>,
+    ) -> Result<Auth, Self::Error> {
+        debug!("SSH publickey offered from {} as '{}': {}", self.ip, user, offer.public_key.fingerprint(HashAlg::Sha256));
         // Accept the offered key - we'll log it when auth_publickey is called
-        std::future::ready(Ok(Auth::Accept))
+        Ok(Auth::Accept)
     }
 
     /// Accept session channel open
-    fn channel_open_session(
+    async fn channel_open_session(
         &mut self,
         channel: Channel<Msg>,
+        reply: ChannelOpenHandle,
         _session: &mut Session,
-    ) -> impl std::future::Future<Output = Result<bool, Self::Error>> + Send {
+    ) -> Result<(), Self::Error> {
         debug!("SSH channel_open_session from {}", self.ip);
         
         // Security: Limit channels per session
         if self.channels.len() >= MAX_CHANNELS_PER_SESSION {
             debug!("SSH channel limit reached for {}", self.ip);
-            return std::future::ready(Ok(false));
+            reply.reject(ChannelOpenFailure::AdministrativelyProhibited).await;
+            return Ok(());
         }
         
         self.channels.insert(channel.id(), ChannelState::default());
-        std::future::ready(Ok(true))
+        reply.accept().await;
+        Ok(())
     }
 
     /// Accept PTY request
-    fn pty_request(
+    async fn pty_request(
         &mut self,
         channel: ChannelId,
         _term: &str,
@@ -324,18 +327,18 @@ impl Handler for SshSession {
         _pix_height: u32,
         _modes: &[(Pty, u32)],
         session: &mut Session,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send {
+    ) -> Result<(), Self::Error> {
         debug!("SSH pty_request from {}", self.ip);
-        session.channel_success(channel);
-        std::future::ready(Ok(()))
+        let _ = session.channel_success(channel);
+        Ok(())
     }
 
     /// Handle shell request - send welcome and prompt
-    fn shell_request(
+    async fn shell_request(
         &mut self,
         channel: ChannelId,
         session: &mut Session,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send {
+    ) -> Result<(), Self::Error> {
         debug!("SSH shell_request from {}", self.ip);
         
         if let Some(state) = self.channels.get_mut(&channel) {
@@ -348,23 +351,23 @@ impl Handler for SshSession {
             chrono::Local::now().format("%a %b %d %H:%M:%S %Y"),
             self.ip
         );
-        session.data(channel, banner.into());
+        let _ = session.data(channel, banner);
         
         // Send prompt
         let prompt = self.get_prompt();
-        session.data(channel, prompt.into());
+        let _ = session.data(channel, prompt);
         
-        session.channel_success(channel);
-        std::future::ready(Ok(()))
+        let _ = session.channel_success(channel);
+        Ok(())
     }
 
     /// Handle exec request - single command execution
-    fn exec_request(
+    async fn exec_request(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut Session,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send {
+    ) -> Result<(), Self::Error> {
         let command = String::from_utf8_lossy(data).to_string();
         debug!("SSH exec_request from {}: {}", self.ip, command);
         
@@ -376,27 +379,27 @@ impl Handler for SshSession {
         // Generate and send fake output
         let output = Self::generate_fake_output(&command);
         if !output.is_empty() {
-            session.data(channel, output.into());
+            let _ = session.data(channel, output);
         }
         
         // Log commands immediately for exec requests
         self.log_commands(channel);
         
         // Send exit status and close
-        session.exit_status_request(channel, 0);
-        session.channel_success(channel);
-        session.close(channel);
+        let _ = session.exit_status_request(channel, 0);
+        let _ = session.channel_success(channel);
+        let _ = session.close(channel);
         
-        std::future::ready(Ok(()))
+        Ok(())
     }
 
     /// Handle data from client - interactive shell input
-    fn data(
+    async fn data(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut Session,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send {
+    ) -> Result<(), Self::Error> {
         let input = String::from_utf8_lossy(data);
         debug!("SSH data from {}: {:?}", self.ip, input);
         
@@ -407,7 +410,7 @@ impl Handler for SshSession {
                 match ch {
                     '\r' | '\n' => {
                         // Echo newline
-                        session.data(channel, "\r\n".to_string().into());
+                        let _ = session.data(channel, "\r\n");
                         
                         let cmd = state.line_buffer.trim().to_string();
                         if !cmd.is_empty() {
@@ -421,7 +424,7 @@ impl Handler for SshSession {
                                 // Generate and send fake output
                                 let output = Self::generate_fake_output(&cmd);
                                 if !output.is_empty() {
-                                    session.data(channel, output.into());
+                                    let _ = session.data(channel, output);
                                 }
                             }
                         }
@@ -430,8 +433,7 @@ impl Handler for SshSession {
                         
                         if !should_close {
                             // Send new prompt
-                            let prompt = "root@honeypot:~# ".to_string();
-                            session.data(channel, prompt.into());
+                            let _ = session.data(channel, "root@honeypot:~# ");
                         }
                     }
                     '\x7f' | '\x08' => {
@@ -439,19 +441,18 @@ impl Handler for SshSession {
                         if !state.line_buffer.is_empty() {
                             state.line_buffer.pop();
                             // Echo backspace sequence
-                            session.data(channel, "\x08 \x08".to_string().into());
+                            let _ = session.data(channel, "\x08 \x08");
                         }
                     }
                     '\x03' => {
                         // Ctrl+C
-                        session.data(channel, "^C\r\n".to_string().into());
+                        let _ = session.data(channel, "^C\r\n");
                         state.line_buffer.clear();
-                        let prompt = "root@honeypot:~# ".to_string();
-                        session.data(channel, prompt.into());
+                        let _ = session.data(channel, "root@honeypot:~# ");
                     }
                     '\x04' => {
                         // Ctrl+D - logout
-                        session.data(channel, "\r\nlogout\r\n".to_string().into());
+                        let _ = session.data(channel, "\r\nlogout\r\n");
                         should_close = true;
                     }
                     _ if ch.is_ascii() && !ch.is_control() => {
@@ -459,7 +460,7 @@ impl Handler for SshSession {
                         // Security: Limit line buffer size
                         if state.line_buffer.len() < MAX_LINE_BUFFER {
                             state.line_buffer.push(ch);
-                            session.data(channel, ch.to_string().into());
+                            let _ = session.data(channel, ch.to_string());
                         }
                         // Silently ignore characters beyond limit
                     }
@@ -477,34 +478,34 @@ impl Handler for SshSession {
         
         if should_close {
             self.log_commands(channel);
-            session.exit_status_request(channel, 0);
-            session.close(channel);
+            let _ = session.exit_status_request(channel, 0);
+            let _ = session.close(channel);
         }
         
-        std::future::ready(Ok(()))
+        Ok(())
     }
 
     /// Handle channel close
-    fn channel_close(
+    async fn channel_close(
         &mut self,
         channel: ChannelId,
         _session: &mut Session,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send {
+    ) -> Result<(), Self::Error> {
         debug!("SSH channel_close from {}", self.ip);
         self.log_commands(channel);
         self.channels.remove(&channel);
-        std::future::ready(Ok(()))
+        Ok(())
     }
 
     /// Handle channel EOF
-    fn channel_eof(
+    async fn channel_eof(
         &mut self,
         channel: ChannelId,
         _session: &mut Session,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send {
+    ) -> Result<(), Self::Error> {
         debug!("SSH channel_eof from {}", self.ip);
         self.log_commands(channel);
-        std::future::ready(Ok(()))
+        Ok(())
     }
 }
 
@@ -528,7 +529,7 @@ fn get_or_create_host_key(key_path: &str) -> Result<PrivateKey> {
             fs::create_dir_all(parent)?;
         }
         
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let key = PrivateKey::random(&mut rng, Algorithm::Ed25519)
             .map_err(|e| anyhow::anyhow!("Failed to generate SSH key: {}", e))?;
         
@@ -553,7 +554,7 @@ pub async fn start(
         Ok(key) => key,
         Err(e) => {
             tracing::warn!("Failed to load/generate SSH host key: {}. Generating in-memory key.", e);
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             PrivateKey::random(&mut rng, russh::keys::Algorithm::Ed25519)
                 .expect("Failed to generate in-memory SSH key")
         }

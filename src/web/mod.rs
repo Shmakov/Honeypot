@@ -234,7 +234,7 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         .route("/api/top-ips-bandwidth", get(routes::api_top_ips_bandwidth))
         .route("/api/total-bytes", get(routes::api_total_bytes))
         // Static files
-        .route("/static/*path", get(static_files))
+        .route("/static/{*path}", get(static_files))
         // Catch-all for any other path
         .fallback(any(catch_all))
         .with_state(state.clone())
@@ -273,7 +273,8 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
             &config.server.tls_key,
         ).await?;
         
-        axum_server::bind_rustls(https_addr.parse()?, tls_config)
+        let https_socket_addr: SocketAddr = https_addr.parse()?;
+        axum_server::bind_rustls(https_socket_addr, tls_config)
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await?;
     } else {

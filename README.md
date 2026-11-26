@@ -2,7 +2,7 @@
 
 A low-interaction network honeypot with real-time attack visualization.
 
-![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)
+![Rust](https://img.shields.io/badge/rust-1.94%2B-orange)
 
 ## Demo
 

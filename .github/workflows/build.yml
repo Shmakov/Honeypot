@@ -20,18 +20,18 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libsqlite3-dev pkg-config
+          sudo apt-get install -y libsqlite3-dev pkg-config cmake
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin/
@@ -45,6 +45,9 @@ jobs:
 
       - name: Fetch dependencies
         run: cargo fetch
+
+      - name: Run tests
+        run: cargo test
 
       - name: Build release binary
         run: cargo build --release
@@ -65,7 +68,7 @@ jobs:
           tar -czvf honeypot-linux.tar.gz honeypot-linux
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: honeypot-linux
           path: honeypot-linux.tar.gz
@@ -80,7 +83,7 @@ jobs:
     
     steps:
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: honeypot-linux
 
@@ -138,12 +141,12 @@ jobs:
     
     steps:
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: honeypot-linux
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: honeypot-linux.tar.gz
           generate_release_notes: true

@@ -172,8 +172,11 @@ ftp_banner = "220 Test"
 mysql_version = "5.7"
 "#;
 
-        std::env::set_var("HONEYPOT_MAP__CARTO_API_KEY", "test_key_123");
-        std::env::set_var("HONEYPOT_DATABASE__RETENTION_DAYS", "45");
+        // SAFETY: Test-only env var mutation; no other tests read these HONEYPOT_* variables.
+        unsafe {
+            std::env::set_var("HONEYPOT_MAP__CARTO_API_KEY", "test_key_123");
+            std::env::set_var("HONEYPOT_DATABASE__RETENTION_DAYS", "45");
+        }
         let settings = config::Config::builder()
             .add_source(config::File::from_str(minimal_toml, config::FileFormat::Toml))
             .add_source(
@@ -190,8 +193,11 @@ mysql_version = "5.7"
             .try_deserialize()
             .unwrap();
         let cfg: Config = settings.try_deserialize().unwrap();
-        std::env::remove_var("HONEYPOT_MAP__CARTO_API_KEY");
-        std::env::remove_var("HONEYPOT_DATABASE__RETENTION_DAYS");
+        // SAFETY: Clean up test-only env vars immediately after deserialization.
+        unsafe {
+            std::env::remove_var("HONEYPOT_MAP__CARTO_API_KEY");
+            std::env::remove_var("HONEYPOT_DATABASE__RETENTION_DAYS");
+        }
 
         assert_eq!(cfg_default_check.database.retention_days, 30);
         assert_eq!(cfg.database.retention_days, 45);

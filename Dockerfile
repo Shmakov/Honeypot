@@ -1,5 +1,9 @@
 # Build stage
-FROM rust:1.75-bookworm as builder
+FROM rust:1.100-trixie AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
@@ -9,7 +13,7 @@ COPY src ./src
 RUN cargo build --release
 
 # Runtime stage
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \

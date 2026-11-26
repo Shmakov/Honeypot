@@ -6,7 +6,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
     Json,
 };
-use cached::proc_macro::cached;
+use cached::macros::cached;
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -67,7 +67,7 @@ fn validate_hours(hours: i64) -> Result<i64, ApiError> {
 }
 
 /// Cached stats query - 5 minute TTL (uses hybrid rollup + live)
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
 async fn get_cached_stats(hours: i64, db: Database) -> StatsResponse {
     db.get_stats_hybrid(hours).await.unwrap_or_else(|_| StatsResponse {
         total: 0,
@@ -78,43 +78,43 @@ async fn get_cached_stats(hours: i64, db: Database) -> StatsResponse {
 }
 
 /// Cached countries query - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
 async fn get_cached_countries(hours: i64, db: Database) -> Vec<CountryStat> {
     db.get_country_stats(hours).await.unwrap_or_default()
 }
 
 /// Cached locations query - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
 async fn get_cached_locations(hours: i64, db: Database) -> Vec<LocationStat> {
     db.get_location_stats(hours, 2000).await.unwrap_or_default()
 }
 
 /// Cached recent credentials - 60 second TTL
-#[cached(time = 60, key = "()", convert = r#"{ () }"#, sync_writes = true)]
+#[cached(ttl_secs = 60, key = "()", convert = { () }, sync_writes = "by_key")]
 async fn get_cached_recent_credentials(db: Database) -> Vec<(String, String)> {
     db.get_recent_credentials(10).await.unwrap_or_default()
 }
 
 /// Cached recent commands - 60 second TTL
-#[cached(time = 60, key = "()", convert = r#"{ () }"#, sync_writes = true)]
+#[cached(ttl_secs = 60, key = "()", convert = { () }, sync_writes = "by_key")]
 async fn get_cached_recent_commands(db: Database) -> Vec<String> {
     db.get_recent_commands(10).await.unwrap_or_default()
 }
 
 /// Cached top IPs by request count - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
 async fn get_cached_top_ips_requests(hours: i64, db: Database) -> Vec<IpStat> {
     db.get_top_ips_by_requests(hours, 25).await.unwrap_or_default()
 }
 
 /// Cached top IPs by bandwidth - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
 async fn get_cached_top_ips_bandwidth(hours: i64, db: Database) -> Vec<IpStat> {
     db.get_top_ips_by_bandwidth(hours, 25).await.unwrap_or_default()
 }
 
 /// Cached total bytes - 5 minute TTL
-#[cached(time = 300, key = "i64", convert = r#"{ hours }"#, sync_writes = true)]
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
 async fn get_cached_total_bytes(hours: i64, db: Database) -> i64 {
     db.get_total_bytes(hours).await.unwrap_or(0)
 }

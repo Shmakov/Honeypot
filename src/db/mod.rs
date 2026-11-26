@@ -108,7 +108,7 @@ impl Database {
                         .execute(&mut *conn)
                         .await?;
                     // Performance: Configurable page cache
-                    sqlx::query(&format!("PRAGMA cache_size = -{}", cache_size_kb))
+                    sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA cache_size = -{}", cache_size_kb)))
                         .execute(&mut *conn)
                         .await?;
                     // Performance: Keep temp tables in memory
@@ -163,7 +163,7 @@ impl Database {
 
         // Drop unused or redundant legacy indexes
         for stmt in schema::DROP_UNUSED_INDEXES {
-            sqlx::query(stmt)
+            sqlx::query(*stmt)
                 .execute(&self.pool)
                 .await?;
         }
