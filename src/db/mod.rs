@@ -258,22 +258,41 @@ impl Database {
     }
 
     pub async fn get_recent_credentials(&self, limit: i32) -> Result<Vec<(String, String)>> {
-        let rows: Vec<(String, String)> = sqlx::query_as(
-            "SELECT username, password FROM requests WHERE username IS NOT NULL ORDER BY id DESC LIMIT ?"
+        let fetch_limit = (limit * 5).max(limit);
+        let rows: Vec<(String, String, Option<String>)> = sqlx::query_as(
+            "SELECT service, username, password FROM requests WHERE username IS NOT NULL ORDER BY id DESC LIMIT ?"
         )
-        .bind(limit)
+        .bind(fetch_limit)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows)
+
+        let max_creds = limit.max(0) as usize;
+        let filtered = rows
+            .into_iter()
+            .filter_map(|(service, username, password)| {
+                let password = password.unwrap_or_default();
+                if service == "telnet"
+                    && (crate::handlers::telnet::is_suspicious_telnet_username(&username)
+                        || crate::handlers::telnet::is_http_header_line(&password))
+                {
+                    None
+                } else {
+                    Some((username, password))
+                }
+            })
+            .take(max_creds)
+            .collect();
+
+        Ok(filtered)
     }
 
     /// Get recent commands from SSH/telnet sessions (stored in payload as hex-encoded text)
     pub async fn get_recent_commands(&self, limit: i32) -> Result<Vec<String>> {
         // Query for recent ssh/telnet events with payload (contains commands)
         // SSH stores "SSH shell commands from..." in request field
-        let rows: Vec<(String,)> = sqlx::query_as(
+        let rows: Vec<(String, String, Option<String>)> = sqlx::query_as(
             r#"
-            SELECT payload FROM requests 
+            SELECT service, payload, username FROM requests 
             WHERE payload IS NOT NULL 
             AND (service = 'ssh' OR service = 'telnet')
             ORDER BY id DESC 
@@ -284,15 +303,29 @@ impl Database {
         .fetch_all(&self.pool)
         .await?;
         
+        let max_commands = limit.max(0) as usize;
         let mut commands = Vec::new();
-        for (hex_payload,) in rows {
+        for (service, hex_payload, username) in rows {
+            if service == "telnet"
+                && username
+                    .as_deref()
+                    .is_some_and(crate::handlers::telnet::is_suspicious_telnet_username)
+            {
+                continue;
+            }
+
             // Decode hex payload to string
             if let Ok(bytes) = hex::decode(&hex_payload) {
                 if let Ok(text) = String::from_utf8(bytes) {
                     // Split by newlines and add individual commands
                     for line in text.lines() {
                         let cmd = line.trim();
-                        if !cmd.is_empty() && commands.len() < limit as usize {
+                        if service == "telnet"
+                            && crate::handlers::telnet::is_http_header_line(cmd)
+                        {
+                            continue;
+                        }
+                        if !cmd.is_empty() && commands.len() < max_commands {
                             commands.push(cmd.to_string());
                         }
                     }
@@ -301,7 +334,7 @@ impl Database {
         }
         
         // Limit total commands
-        commands.truncate(limit as usize);
+        commands.truncate(max_commands);
         Ok(commands)
     }
 
@@ -1393,6 +1426,69 @@ mod tests {
             legacy_indexes.is_empty(),
             "Expected legacy indexes to be dropped, found: {:?}",
             legacy_indexes
+        );
+    }
+
+    #[tokio::test]
+    async fn test_recent_credentials_and_commands_filter_telnet_probes() {
+        let tmp = setup_temp_db().await;
+        let db = &tmp.db;
+        let now_ms = Utc::now().timestamp_millis();
+
+        // Valid SSH credentials + command event
+        let mut ssh_auth = AttackEvent::new("1.2.3.4".to_string(), "ssh".to_string(), 22, "SSH auth".to_string())
+            .with_credentials("admin".to_string(), "admin123".to_string());
+        ssh_auth.timestamp = DateTime::from_timestamp_millis(now_ms).unwrap();
+
+        let mut ssh_cmd = AttackEvent::new("1.2.3.4".to_string(), "ssh".to_string(), 22, "SSH shell".to_string())
+            .with_payload(b"id\nwhoami".to_vec());
+        ssh_cmd.timestamp = DateTime::from_timestamp_millis(now_ms + 1).unwrap();
+
+        // Valid Telnet credentials + command event
+        let mut telnet_valid = AttackEvent::new("1.2.3.5".to_string(), "telnet".to_string(), 23, "Telnet login".to_string())
+            .with_credentials("root".to_string(), "root".to_string())
+            .with_payload(b"uname -a".to_vec());
+        telnet_valid.timestamp = DateTime::from_timestamp_millis(now_ms + 2).unwrap();
+
+        // Historical polluted Telnet HTTP probe event
+        let mut telnet_http_probe = AttackEvent::new("1.2.3.6".to_string(), "telnet".to_string(), 23, "Telnet login".to_string())
+            .with_credentials("GET / HTTP/1.1".to_string(), "Host: 35.212.148.194:23".to_string())
+            .with_payload(b"User-Agent: Mozilla/5.0\nAccept-Encoding: gzip\nConnection: close".to_vec());
+        telnet_http_probe.timestamp = DateTime::from_timestamp_millis(now_ms + 3).unwrap();
+
+        // Historical polluted Telnet binary/TLS probe event
+        let mut telnet_binary_probe = AttackEvent::new("1.2.3.7".to_string(), "telnet".to_string(), 23, "Telnet login".to_string())
+            .with_credentials("[A|\"0OLw>djp`T>& IAU".to_string(), "i(NoX4?!2+/,0".to_string())
+            .with_payload(b"/5".to_vec());
+        telnet_binary_probe.timestamp = DateTime::from_timestamp_millis(now_ms + 4).unwrap();
+
+        db.batch_insert_events(&[
+            ssh_auth,
+            ssh_cmd,
+            telnet_valid,
+            telnet_http_probe,
+            telnet_binary_probe,
+        ])
+        .await
+        .unwrap();
+
+        let creds = db.get_recent_credentials(10).await.unwrap();
+        assert_eq!(
+            creds,
+            vec![
+                ("root".to_string(), "root".to_string()),
+                ("admin".to_string(), "admin123".to_string()),
+            ]
+        );
+
+        let cmds = db.get_recent_commands(10).await.unwrap();
+        assert_eq!(
+            cmds,
+            vec![
+                "uname -a".to_string(),
+                "id".to_string(),
+                "whoami".to_string(),
+            ]
         );
     }
 }
