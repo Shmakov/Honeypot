@@ -252,17 +252,13 @@ pub fn record_event(
         .and_then(|hex_str| hex::decode(hex_str).ok())
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned());
 
-    // Extract IOCs from request + http_path + decoded payload and merge with any pre-extracted IOCs
-    let mut ioc_corpus = event.request.clone();
-    if let Some(ref p) = event.http_path {
-        ioc_corpus.push('\n');
-        ioc_corpus.push_str(p);
-    }
-    if let Some(ref dp) = decoded_payload {
-        ioc_corpus.push('\n');
-        ioc_corpus.push_str(dp);
-    }
-    for item in ioc::extract_iocs(&ioc_corpus) {
+    // Extract IOCs aware of protocol context (ignores benign HTTP Referer/UA URLs)
+    for item in ioc::extract_iocs_for_event(
+        &event.service,
+        &event.request,
+        event.http_path.as_deref(),
+        decoded_payload.as_deref(),
+    ) {
         if !event.iocs.iter().any(|existing| existing == &item) {
             event.iocs.push(item);
         }

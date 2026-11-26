@@ -448,16 +448,12 @@ impl Database {
                     .as_deref()
                     .and_then(|h| hex::decode(h).ok())
                     .map(|b| String::from_utf8_lossy(&b).into_owned());
-                let mut corpus = request_text.clone();
-                if let Some(ref p) = r.http_path {
-                    corpus.push('\n');
-                    corpus.push_str(p);
-                }
-                if let Some(ref dp) = decoded_payload {
-                    corpus.push('\n');
-                    corpus.push_str(dp);
-                }
-                let extracted_iocs = ioc::extract_iocs(&corpus);
+                let extracted_iocs = ioc::extract_iocs_for_event(
+                    &r.service,
+                    &request_text,
+                    r.http_path.as_deref(),
+                    decoded_payload.as_deref(),
+                );
 
                 AttackEvent {
                     id: Some(r.id),
