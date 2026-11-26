@@ -78,7 +78,7 @@ pub async fn start(
 
                     let mut buf = vec![0u8; 4096];
                     let timeout = tokio::time::timeout(
-                        std::time::Duration::from_secs(30),
+                        std::time::Duration::from_secs(10),
                         socket.read(&mut buf),
                     );
 

@@ -126,11 +126,11 @@ impl Default for LimitsConfig {
 }
 
 fn default_max_connections_per_ip() -> usize {
-    20
+    128
 }
 
 fn default_max_total_connections() -> usize {
-    2000
+    4096
 }
 
 fn default_write_buffer_capacity() -> usize {
@@ -262,8 +262,8 @@ mysql_version = "5.7"
         assert_eq!(cfg_default_check.geoip.asn_database, "data/GeoLite2-ASN.mmdb");
         assert_eq!(cfg_default_check.emulation.hostname, "prod-web-01");
         assert_eq!(cfg_default_check.emulation.persona, "ubuntu");
-        assert_eq!(cfg_default_check.limits.max_connections_per_ip, 20);
-        assert_eq!(cfg_default_check.limits.max_total_connections, 2000);
+        assert_eq!(cfg_default_check.limits.max_connections_per_ip, 128);
+        assert_eq!(cfg_default_check.limits.max_total_connections, 4096);
         assert_eq!(cfg_default_check.limits.write_buffer_capacity, 10_000);
         assert!(cfg_default_check.limits.udp_enabled);
         assert_eq!(cfg.database.retention_days, 45);

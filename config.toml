@@ -49,7 +49,7 @@ carto_api_key = ""
 
 # DoS resilience & listener limits
 [limits]
-max_connections_per_ip = 20
-max_total_connections = 2000
+max_connections_per_ip = 128
+max_total_connections = 4096
 write_buffer_capacity = 10000
 udp_enabled = true
