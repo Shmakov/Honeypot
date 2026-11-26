@@ -4,12 +4,14 @@ use anyhow::Result;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
+use crate::classifier;
 use crate::config::Config;
 use crate::db::{AttackEvent, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
+use crate::limits::{ConnectionLimiter, ConnectionPermit};
 
 pub async fn start(
     port: u16,
@@ -17,6 +19,7 @@ pub async fn start(
     event_bus: Arc<EventBus>,
     write_tx: WriteSender,
     geoip: SharedGeoIp,
+    limiter: Arc<ConnectionLimiter>,
 ) -> Result<()> {
     let addr = format!("{}:{}", config.server.host, port);
     let listener = match TcpListener::bind(&addr).await {
@@ -34,13 +37,22 @@ pub async fn start(
         match listener.accept().await {
             Ok((socket, peer_addr)) => {
                 let ip = peer_addr.ip().to_string();
+                let Some(permit) = limiter.try_acquire(&ip) else {
+                    debug!("FTP connection rejected (concurrency limit) from {}", ip);
+                    drop(socket);
+                    continue;
+                };
+
                 let event_bus = event_bus.clone();
                 let write_tx = write_tx.clone();
                 let banner = banner.clone();
                 let geoip = geoip.clone();
 
                 tokio::spawn(async move {
-                    handle_ftp_session(socket, ip, port, banner, event_bus, write_tx, geoip).await;
+                    handle_ftp_session(
+                        socket, ip, port, banner, event_bus, write_tx, geoip, permit,
+                    )
+                    .await;
                 });
             }
             Err(e) => {
@@ -50,6 +62,7 @@ pub async fn start(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_ftp_session(
     socket: tokio::net::TcpStream,
     ip: String,
@@ -58,34 +71,37 @@ async fn handle_ftp_session(
     event_bus: Arc<EventBus>,
     write_tx: WriteSender,
     geoip: SharedGeoIp,
+    _permit: ConnectionPermit,
 ) {
     let (reader, mut writer) = socket.into_split();
     let mut reader = BufReader::new(reader);
 
-    // Send welcome banner
-    let _ = writer.write_all(format!("{}\r\n", banner).as_bytes()).await;
+    let _ = writer
+        .write_all(format!("{}\r\n", banner).as_bytes())
+        .await;
 
     let mut username = String::new();
     let mut password = String::new();
     let mut commands = Vec::new();
 
-    // Read FTP commands with timeout
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         let mut line = String::new();
         loop {
             line.clear();
             match reader.read_line(&mut line).await {
-                Ok(0) => break, // Connection closed
+                Ok(0) => break,
                 Ok(_) => {
+                    if line.len() > 2048 {
+                        break;
+                    }
                     let cmd = line.trim().to_string();
-                    
-                    // Security: Limit command buffer to prevent memory exhaustion
+
                     if commands.len() < 100 {
                         commands.push(cmd.clone());
                     }
 
                     let parts: Vec<&str> = cmd.splitn(2, ' ').collect();
-                    let command = parts.get(0).map(|s| s.to_uppercase()).unwrap_or_default();
+                    let command = parts.first().map(|s| s.to_uppercase()).unwrap_or_default();
                     let arg = parts.get(1).map(|s| s.to_string()).unwrap_or_default();
 
                     match command.as_str() {
@@ -96,7 +112,6 @@ async fn handle_ftp_session(
                         "PASS" => {
                             password = arg;
                             let _ = writer.write_all(b"230 Login successful\r\n").await;
-                            // After capturing credentials, we can close
                             break;
                         }
                         "QUIT" => {
@@ -107,7 +122,9 @@ async fn handle_ftp_session(
                             let _ = writer.write_all(b"215 UNIX Type: L8\r\n").await;
                         }
                         "PWD" => {
-                            let _ = writer.write_all(b"257 \"/\" is current directory\r\n").await;
+                            let _ = writer
+                                .write_all(b"257 \"/\" is current directory\r\n")
+                                .await;
                         }
                         "LIST" | "NLST" => {
                             let _ = writer.write_all(b"150 Opening data connection\r\n").await;
@@ -117,8 +134,9 @@ async fn handle_ftp_session(
                             let _ = writer.write_all(b"200 Type set\r\n").await;
                         }
                         "PASV" => {
-                            // Fake passive mode response
-                            let _ = writer.write_all(b"227 Entering Passive Mode (127,0,0,1,100,100)\r\n").await;
+                            let _ = writer
+                                .write_all(b"227 Entering Passive Mode (127,0,0,1,100,100)\r\n")
+                                .await;
                         }
                         _ => {
                             let _ = writer.write_all(b"502 Command not implemented\r\n").await;
@@ -132,33 +150,22 @@ async fn handle_ftp_session(
 
     let _ = timeout.await;
 
-    // Create event
     let request = if !username.is_empty() {
         format!("FTP login: {}:{} from {}", username, password, ip)
     } else {
         format!("FTP connection from {}", ip)
     };
 
-    let mut event = AttackEvent::new(ip.clone(), "ftp".to_string(), port, request);
-    
-    // Calculate request size from commands
-    let request_size: u32 = commands.iter().map(|c| c.len() as u32 + 2).sum(); // +2 for \r\n
+    let mut event = AttackEvent::new(ip, "ftp".to_string(), port, request);
+    let request_size: u32 = commands.iter().map(|c| c.len() as u32 + 2).sum();
     event = event.with_request_size(request_size);
-    
+
     if !username.is_empty() {
         event = event.with_credentials(username, password);
     }
-    
     if !commands.is_empty() {
         event = event.with_payload(commands.join("\n").into_bytes());
     }
-    
-    // Add GeoIP info
-    if let Some(loc) = geoip.lookup(&ip) {
-        event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
-    }
 
-    // Send to write buffer (non-blocking) and broadcast
-    let _ = write_tx.send(event.clone());
-    event_bus.publish(event);
+    classifier::record_event(event, &geoip, &write_tx, &event_bus);
 }

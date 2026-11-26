@@ -12,6 +12,8 @@ pub struct Config {
     pub emulation: EmulationConfig,
     #[serde(default)]
     pub map: MapConfig,
+    #[serde(default)]
+    pub limits: LimitsConfig,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -62,6 +64,12 @@ fn default_max_ports() -> usize {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GeoIpConfig {
     pub database: String,
+    #[serde(default = "default_asn_database")]
+    pub asn_database: String,
+}
+
+fn default_asn_database() -> String {
+    "data/GeoLite2-ASN.mmdb".to_string()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -74,12 +82,63 @@ pub struct EmulationConfig {
     pub ssh_banner: String,
     pub ftp_banner: String,
     pub mysql_version: String,
+    #[serde(default = "default_hostname")]
+    pub hostname: String,
+    #[serde(default = "default_persona")]
+    pub persona: String,
+}
+
+fn default_hostname() -> String {
+    "prod-web-01".to_string()
+}
+
+fn default_persona() -> String {
+    "ubuntu".to_string()
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct MapConfig {
     #[serde(default)]
     pub carto_api_key: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LimitsConfig {
+    #[serde(default = "default_max_connections_per_ip")]
+    pub max_connections_per_ip: usize,
+    #[serde(default = "default_max_total_connections")]
+    pub max_total_connections: usize,
+    #[serde(default = "default_write_buffer_capacity")]
+    pub write_buffer_capacity: usize,
+    #[serde(default = "default_udp_enabled")]
+    pub udp_enabled: bool,
+}
+
+impl Default for LimitsConfig {
+    fn default() -> Self {
+        Self {
+            max_connections_per_ip: default_max_connections_per_ip(),
+            max_total_connections: default_max_total_connections(),
+            write_buffer_capacity: default_write_buffer_capacity(),
+            udp_enabled: default_udp_enabled(),
+        }
+    }
+}
+
+fn default_max_connections_per_ip() -> usize {
+    20
+}
+
+fn default_max_total_connections() -> usize {
+    2000
+}
+
+fn default_write_buffer_capacity() -> usize {
+    10_000
+}
+
+fn default_udp_enabled() -> bool {
+    true
 }
 
 impl Config {
@@ -200,6 +259,13 @@ mysql_version = "5.7"
         }
 
         assert_eq!(cfg_default_check.database.retention_days, 30);
+        assert_eq!(cfg_default_check.geoip.asn_database, "data/GeoLite2-ASN.mmdb");
+        assert_eq!(cfg_default_check.emulation.hostname, "prod-web-01");
+        assert_eq!(cfg_default_check.emulation.persona, "ubuntu");
+        assert_eq!(cfg_default_check.limits.max_connections_per_ip, 20);
+        assert_eq!(cfg_default_check.limits.max_total_connections, 2000);
+        assert_eq!(cfg_default_check.limits.write_buffer_capacity, 10_000);
+        assert!(cfg_default_check.limits.udp_enabled);
         assert_eq!(cfg.database.retention_days, 45);
         assert_eq!(cfg.map.carto_api_key, "test_key_123");
     }

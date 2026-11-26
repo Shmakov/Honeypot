@@ -76,12 +76,28 @@
 
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
-                    <div id="totalRequests" class="text-3xl font-bold text-white">-</div>
-                    <div class="text-sm text-gray-500 mt-1">Total Requests</div>
-                    <div class="mt-3 pt-3 border-t border-gray-800">
-                        <span id="sessionRequests" class="text-lg font-semibold text-cyan-400">0</span>
-                        <span class="text-sm text-gray-500 ml-1">this session</span>
+                <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-start justify-between gap-2">
+                            <div id="monthlyRequests" class="text-3xl font-bold text-white tabular-nums">-</div>
+                            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-semibold tabular-nums shrink-0"
+                                title="Rolling request rate">
+                                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                                <span id="requestsPerMin">0.0</span>
+                                <span>req/min</span>
+                            </div>
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1">Requests (Last 30 Days)</div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between gap-3 text-sm">
+                        <div>
+                            <span id="sessionRequests" class="font-semibold text-cyan-400 tabular-nums">0</span>
+                            <span class="text-gray-500 ml-1">this session</span>
+                        </div>
+                        <div class="text-right">
+                            <span id="totalRequests" class="font-semibold text-gray-300 tabular-nums">-</span>
+                            <span class="text-gray-500 ml-1">all-time</span>
+                        </div>
                     </div>
                 </div>
                 <div class="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-xl p-6">
@@ -203,6 +219,22 @@
                         </div>
                     </div>
 
+                    <!-- ASN / Org -->
+                    <div id="asnRow" class="hidden">
+                        <div class="flex items-start gap-4 text-sm">
+                            <span class="text-gray-500 shrink-0">Network / ASN:</span>
+                            <span id="detailAsn" class="text-gray-300 font-mono text-xs">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Attack Tags -->
+                    <div id="tagsRow" class="hidden">
+                        <div class="flex items-start gap-4 text-sm">
+                            <span class="text-gray-500 shrink-0">Tags:</span>
+                            <div id="detailTags" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                    </div>
+
                     <!-- Credentials (if present) -->
                     <div id="credentialsRow" class="hidden">
                         <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
@@ -235,6 +267,18 @@
                         </div>
                         <pre id="detailPayload"
                             class="bg-gray-950 border border-gray-800 rounded-xl p-4 text-sm font-mono text-green-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto scrollbar-thin">No payload</pre>
+                    </div>
+
+                    <!-- Extracted IOCs -->
+                    <div id="iocsSection" class="hidden">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="text-red-400">🚨</span>
+                            <span class="text-sm text-gray-400 uppercase tracking-wide font-medium">Extracted IOCs
+                                (Defanged)</span>
+                        </div>
+                        <div id="detailIocs"
+                            class="bg-gray-950 border border-red-500/20 rounded-xl p-4 space-y-2 font-mono text-xs text-red-300 max-h-40 overflow-y-auto">
+                        </div>
                     </div>
                 </div>
             </div>

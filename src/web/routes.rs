@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::AppState;
-use crate::db::{AttackEvent, CountryStat, CredentialStat, Database, IpStat, LocationStat, StatsResponse};
+use crate::db::{
+    AttackEvent, CountryStat, CredentialStat, Database, IntelligenceResponse, IpStat, LocationStat,
+    SpikeSummary, StatsResponse, TimeSeriesResponse,
+};
 
 /// API error response
 #[derive(Debug, Serialize)]
@@ -119,6 +122,42 @@ async fn get_cached_total_bytes(hours: i64, db: Database) -> i64 {
     db.get_total_bytes(hours).await.unwrap_or(0)
 }
 
+/// Cached timeseries query (60s for 24h, 300s for longer ranges)
+#[cached(ttl_secs = 60, key = "i64", convert = { hours }, sync_writes = "by_key")]
+async fn get_cached_timeseries_short(hours: i64, db: Database) -> TimeSeriesResponse {
+    db.get_timeseries(hours).await.unwrap_or_else(|_| TimeSeriesResponse {
+        granularity: "hour".to_string(),
+        top_services: vec![],
+        points: vec![],
+        spikes: SpikeSummary::default(),
+    })
+}
+
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
+async fn get_cached_timeseries_long(hours: i64, db: Database) -> TimeSeriesResponse {
+    db.get_timeseries(hours).await.unwrap_or_else(|_| TimeSeriesResponse {
+        granularity: "day".to_string(),
+        top_services: vec![],
+        points: vec![],
+        spikes: SpikeSummary::default(),
+    })
+}
+
+#[cached(ttl_secs = 300, key = "i64", convert = { hours }, sync_writes = "by_key")]
+async fn get_cached_intelligence(hours: i64, db: Database) -> IntelligenceResponse {
+    db.get_intelligence(hours)
+        .await
+        .unwrap_or_else(|_| IntelligenceResponse {
+            tags: vec![],
+            ports: vec![],
+            user_agents: vec![],
+            commands: vec![],
+            asns: vec![],
+            scanner_requests: 0,
+            recent_iocs: vec![],
+        })
+}
+
 /// API: Get statistics (cached for 5 minutes)
 pub async fn api_stats(
     State(state): State<Arc<AppState>>,
@@ -131,18 +170,32 @@ pub async fn api_stats(
 #[derive(Debug, Serialize)]
 pub struct RecentResponse {
     pub total: i64,
+    pub last_30_days: i64,
+    pub requests_per_minute: f64,
     pub credentials: Vec<CredentialStat>,
     pub commands: Vec<String>,
     pub events: Vec<AttackEvent>,
 }
 
-/// API: Get recent data for dashboard (credentials/commands cached 60s, events fresh)
+#[cached(ttl_secs = 5, key = "()", convert = { () }, sync_writes = "by_key")]
+async fn get_cached_last_30_days_count(db: Database) -> i64 {
+    db.get_last_30_days_count().await.unwrap_or(0)
+}
+
+/// API: Get recent data for dashboard (30d total & creds/commands cached, live RPM & events fresh)
 pub async fn api_recent(State(state): State<Arc<AppState>>) -> Json<RecentResponse> {
-    let total = state.db.get_total_count().await.unwrap_or(0);
-    let creds = get_cached_recent_credentials(state.db.clone()).await;
-    let commands = get_cached_recent_commands(state.db.clone()).await;
-    let events = state.db.get_recent_events(25).await.unwrap_or_default();
-    
+    let (total, last_30_days, creds, commands, events) = tokio::join!(
+        state.db.get_total_count(),
+        get_cached_last_30_days_count(state.db.clone()),
+        get_cached_recent_credentials(state.db.clone()),
+        get_cached_recent_commands(state.db.clone()),
+        state.db.get_recent_events(25),
+    );
+
+    let total = total.unwrap_or(0);
+    let requests_per_minute = state.event_bus.requests_per_minute();
+    let events = events.unwrap_or_default();
+
     let credentials: Vec<CredentialStat> = creds
         .into_iter()
         .map(|(username, password)| CredentialStat {
@@ -152,7 +205,14 @@ pub async fn api_recent(State(state): State<Arc<AppState>>) -> Json<RecentRespon
         })
         .collect();
 
-    Json(RecentResponse { total, credentials, commands, events })
+    Json(RecentResponse {
+        total,
+        last_30_days,
+        requests_per_minute,
+        credentials,
+        commands,
+        events,
+    })
 }
 
 
@@ -201,6 +261,29 @@ pub async fn api_total_bytes(
     Ok(Json(get_cached_total_bytes(hours, state.db.clone()).await))
 }
 
+/// API: Get attack activity time-series with wave/spike detection
+pub async fn api_timeseries(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<TimeSeriesResponse>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    let resp = if hours <= 24 {
+        get_cached_timeseries_short(hours, state.db.clone()).await
+    } else {
+        get_cached_timeseries_long(hours, state.db.clone()).await
+    };
+    Ok(Json(resp))
+}
+
+/// API: Get deep attack intelligence (tags, ports, UAs, commands, ASNs, IOCs)
+pub async fn api_intelligence(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<StatsQuery>,
+) -> Result<Json<IntelligenceResponse>, ApiError> {
+    let hours = validate_hours(query.hours)?;
+    Ok(Json(get_cached_intelligence(hours, state.db.clone()).await))
+}
+
 /// Client configuration exposed to the frontend
 #[derive(Debug, Serialize)]
 pub struct ClientConfig {
@@ -216,6 +299,11 @@ pub async fn api_config(State(state): State<Arc<AppState>>) -> Json<ClientConfig
 
 /// Warm the cache for the default time range (called on startup)
 pub async fn warm_cache(db: &Database) {
+    if db.get_total_count().await.unwrap_or(0) == 0 {
+        tracing::info!("Skipping cache warm on empty database");
+        return;
+    }
+
     const DEFAULT_HOURS: i64 = 720; // 30 days - matches stats page default
     
     tracing::info!("Warming cache for {} hour time range...", DEFAULT_HOURS);
@@ -224,6 +312,8 @@ pub async fn warm_cache(db: &Database) {
     let _ = get_cached_stats(DEFAULT_HOURS, db.clone()).await;
     let _ = get_cached_countries(DEFAULT_HOURS, db.clone()).await;
     let _ = get_cached_locations(DEFAULT_HOURS, db.clone()).await;
+    let _ = get_cached_timeseries_long(DEFAULT_HOURS, db.clone()).await;
+    let _ = get_cached_intelligence(DEFAULT_HOURS, db.clone()).await;
     let _ = get_cached_recent_credentials(db.clone()).await;
     
     tracing::info!("Cache warmed successfully");

@@ -1,5 +1,6 @@
 //! Web server module
 
+mod decoys;
 mod middleware;
 mod routes;
 mod sse;
@@ -126,7 +127,8 @@ async fn static_files(
     }
 }
 
-/// Handler for all unknown paths - echo request, redirect to home
+/// Handler for all unknown paths - serve realistic decoy traps on targeted paths,
+/// or Request Echo + redirect for everything else.
 /// Note: Logging is handled by the middleware layer
 async fn catch_all(
     State(state): State<Arc<AppState>>,
@@ -137,10 +139,8 @@ async fn catch_all(
     let uri = request.uri().to_string();
     let ip = addr.ip().to_string();
     let headers = request.headers().clone();
-    
-    // Extract body for POST/PUT/PATCH requests (for display purposes)
+
     let body = if method == "POST" || method == "PUT" || method == "PATCH" {
-        // Collect the body
         match axum::body::to_bytes(request.into_body(), 64 * 1024).await {
             Ok(bytes) => Some(bytes),
             Err(_) => None,
@@ -148,22 +148,34 @@ async fn catch_all(
     } else {
         None
     };
-    
+
+    if let Some((status, content_type, decoy_body, _tag)) =
+        decoys::match_decoy(&method, &uri, body.as_deref())
+    {
+        return axum::response::Response::builder()
+            .status(status)
+            .header(header::CONTENT_TYPE, content_type)
+            .body(axum::body::Body::from(decoy_body))
+            .unwrap();
+    }
+
     // Format headers for display
     let headers_display = format_headers(&headers);
-    let body_display = body.as_ref()
+    let body_display = body
+        .as_ref()
         .map(|b| String::from_utf8_lossy(b).to_string())
         .unwrap_or_default();
-    
+
     // Determine redirect URL
     let redirect_url = if state.public_url.is_empty() {
         "/".to_string()
     } else {
         format!("{}/", state.public_url.trim_end_matches('/'))
     };
-    
+
     // Return echo response with meta redirect (200 OK to encourage bot interaction)
-    let html = format!(r#"<!DOCTYPE html>
+    let html = format!(
+        r#"<!DOCTYPE html>
 <html>
 <head>
     <title>Request Received</title>
@@ -197,13 +209,16 @@ async fn catch_all(
         uri = html_escape::encode_text(&uri),
         headers_display = html_escape::encode_text(&headers_display),
         body_section = if !body_display.is_empty() {
-             format!(r#"<p class="label">Body:</p><pre>{}</pre>"#, html_escape::encode_text(&body_display))
+            format!(
+                r#"<p class="label">Body:</p><pre>{}</pre>"#,
+                html_escape::encode_text(&body_display)
+            )
         } else {
             String::new()
         }
     );
-    
-    (StatusCode::OK, axum::response::Html(html))
+
+    (StatusCode::OK, axum::response::Html(html)).into_response()
 }
 
 pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp, write_tx: WriteSender) -> Result<()> {
@@ -233,6 +248,8 @@ pub async fn start_server(config: &Config, event_bus: EventBus, db: Database, ge
         .route("/api/top-ips-requests", get(routes::api_top_ips_requests))
         .route("/api/top-ips-bandwidth", get(routes::api_top_ips_bandwidth))
         .route("/api/total-bytes", get(routes::api_total_bytes))
+        .route("/api/timeseries", get(routes::api_timeseries))
+        .route("/api/intelligence", get(routes::api_intelligence))
         // Static files
         .route("/static/{*path}", get(static_files))
         // Catch-all for any other path

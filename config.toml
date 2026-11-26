@@ -25,9 +25,10 @@ url = "honeypot.db"
 # Raw request retention in days (default: 30; 0 disables pruning). Daily rollups are kept forever.
 retention_days = 30
 
-# GeoIP database path (MaxMind GeoLite2-City.mmdb)
+# GeoIP database paths (MaxMind GeoLite2-City.mmdb and optional GeoLite2-ASN.mmdb)
 [geoip]
 database = "data/GeoLite2-City.mmdb"
+asn_database = "data/GeoLite2-ASN.mmdb"
 
 # Logging
 [logging]
@@ -38,7 +39,17 @@ level = "info"
 ssh_banner = "SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.4"
 ftp_banner = "220 FTP Server ready."
 mysql_version = "5.7.42-0ubuntu0.18.04.1"
+# Decoy hostname and persona ("ubuntu", "iot", or "db")
+hostname = "prod-web-01"
+persona = "ubuntu"
 
 # Map tile settings
 [map]
 carto_api_key = ""
+
+# DoS resilience & listener limits
+[limits]
+max_connections_per_ip = 20
+max_total_connections = 2000
+write_buffer_capacity = 10000
+udp_enabled = true

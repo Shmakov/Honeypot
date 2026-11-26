@@ -81,4 +81,19 @@ if (typeof window !== 'undefined') {
     window.formatNumber = formatNumber;
     window.countryToFlag = countryToFlag;
     window.hexDecode = hexDecode;
+    window.defangValue = function (value) {
+        if (!value) return '';
+        let s = value.replace(/^https:\/\//i, 'hxxps://').replace(/^http:\/\//i, 'hxxp://');
+        const idx = s.indexOf('://');
+        if (idx !== -1) {
+            const prefix = s.slice(0, idx + 3);
+            const rest = s.slice(idx + 3);
+            const slash = rest.indexOf('/');
+            if (slash !== -1) {
+                return prefix + rest.slice(0, slash).replace(/\./g, '[.]') + rest.slice(slash);
+            }
+            return prefix + rest.replace(/\./g, '[.]');
+        }
+        return s.replace(/\./g, '[.]');
+    };
 }

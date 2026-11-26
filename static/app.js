@@ -8,7 +8,11 @@ class HoneypotDashboard {
         this.eventSource = null;
         this.isPaused = false;
         this.sessionCount = 0;
+        this.monthlyCount = 0;
         this.totalCount = 0;
+        this.serverRpm = 0;
+        this.startedAt = Date.now();
+        this.recentTimestamps = [];
         this.maxRows = 100;
         this.events = [];
 
@@ -20,10 +24,13 @@ class HoneypotDashboard {
         this.loadInitialData();
         this.connectSSE();
         this.setupEventListeners();
+        setInterval(() => this.updateRateDisplay(), 5000);
     }
 
     setupElements() {
         this.feedBody = document.getElementById('feedBody');
+        this.monthlyRequests = document.getElementById('monthlyRequests');
+        this.requestsPerMin = document.getElementById('requestsPerMin');
         this.totalRequests = document.getElementById('totalRequests');
         this.sessionRequests = document.getElementById('sessionRequests');
         this.recentCredentials = document.getElementById('recentCredentials');
@@ -38,8 +45,15 @@ class HoneypotDashboard {
             const response = await fetch('/api/recent');
             const data = await response.json();
 
-            this.totalCount = data.total;
+            this.totalCount = data.total || 0;
+            this.monthlyCount = data.last_30_days ?? this.totalCount;
+            this.serverRpm = typeof data.requests_per_minute === 'number' ? data.requests_per_minute : 0;
+
+            if (this.monthlyRequests) {
+                this.monthlyRequests.textContent = this.formatNumber(this.monthlyCount);
+            }
             this.totalRequests.textContent = this.formatNumber(this.totalCount);
+            this.updateRateDisplay();
 
             // Show recent credentials and commands
             this.updateCredentialsList(data.credentials);
@@ -55,6 +69,24 @@ class HoneypotDashboard {
         } catch (error) {
             console.error('Failed to load initial data:', error);
         }
+    }
+
+    updateRateDisplay() {
+        if (!this.requestsPerMin) return;
+        const now = Date.now();
+        const cutoff = now - 60000;
+        this.recentTimestamps = this.recentTimestamps.filter(t => t > cutoff);
+
+        const elapsedSec = (now - this.startedAt) / 1000;
+        let rpm;
+        if (elapsedSec < 60) {
+            const liveRate = this.recentTimestamps.length * (60 / Math.max(elapsedSec, 5));
+            const weight = elapsedSec / 60;
+            rpm = (this.serverRpm * (1 - weight)) + (liveRate * weight);
+        } else {
+            rpm = this.recentTimestamps.length;
+        }
+        this.requestsPerMin.textContent = (Math.max(0, rpm)).toFixed(1);
     }
 
     connectSSE() {
@@ -92,11 +124,17 @@ class HoneypotDashboard {
 
     handleAttackEvent(event) {
         this.sessionCount++;
+        this.monthlyCount++;
         this.totalCount++;
+        this.recentTimestamps.push(Date.now());
 
         // Update counters
-        this.sessionRequests.textContent = this.sessionCount;
+        this.sessionRequests.textContent = this.formatNumber(this.sessionCount);
+        if (this.monthlyRequests) {
+            this.monthlyRequests.textContent = this.formatNumber(this.monthlyCount);
+        }
         this.totalRequests.textContent = this.formatNumber(this.totalCount);
+        this.updateRateDisplay();
 
         // Add to events array
         this.events.unshift(event);
@@ -113,7 +151,7 @@ class HoneypotDashboard {
         }
 
         // Update commands if SSH/telnet event with payload
-        if ((event.service === 'ssh' || event.service === 'telnet') && event.payload) {
+        if ((event.service === 'ssh' || event.service === 'ssh-alt' || event.service === 'telnet' || event.service === 'telnet-alt') && event.payload) {
             try {
                 const decoded = this.hexDecode(event.payload);
                 const commands = decoded.split('\n').filter(cmd => cmd.trim());
@@ -145,12 +183,22 @@ class HoneypotDashboard {
         // Show only first line of request (e.g., "GET /path") not headers
         const requestFirstLine = (event.request || '').split('\n')[0];
 
+        const tags = Array.isArray(event.tags) ? event.tags : [];
+        const tagBadges = tags
+            .slice(0, 2)
+            .map(tag => {
+                const isScanner = tag.startsWith('scanner:');
+                const cls = isScanner ? 'tag-pill tag-scanner' : 'tag-pill tag-alert';
+                return `<span class="${cls}">${this.escapeHtml(tag)}</span>`;
+            })
+            .join('');
+
         row.innerHTML = `
             <td class="px-6 py-3 text-sm text-gray-400">${time}</td>
             <td class="px-6 py-3 font-mono text-sm text-gray-300">${this.escapeHtml(event.ip)}</td>
-            <td class="px-6 py-3 text-sm text-gray-400">${this.countryToFlag(event.country_code)} ${event.country_code || '-'}</td>
-            <td class="px-6 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${serviceClass}">${service}</span></td>
-            <td class="px-6 py-3 text-sm text-gray-400 font-mono truncate max-w-xs" title="${this.escapeHtml(requestFirstLine)}">${this.escapeHtml(this.truncate(requestFirstLine, 50))}</td>
+            <td class="px-6 py-3 text-sm text-gray-400">${this.countryToFlag(event.country_code)} ${this.escapeHtml(event.country_code || '-')}</td>
+            <td class="px-6 py-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${serviceClass}">${this.escapeHtml(service)}</span></td>
+            <td class="px-6 py-3 text-sm text-gray-400 font-mono truncate max-w-xs" title="${this.escapeHtml(requestFirstLine)}">${tagBadges ? `<span class="inline-flex items-center gap-1.5 mr-1.5">${tagBadges}</span>` : ''}${this.escapeHtml(this.truncate(requestFirstLine, 50))}</td>
         `;
 
         row.addEventListener('click', () => this.showEventDetails(event));
@@ -227,6 +275,34 @@ class HoneypotDashboard {
             uaRow.classList.add('hidden');
         }
 
+        // ASN / Org
+        const asnRow = document.getElementById('asnRow');
+        const asnEl = document.getElementById('detailAsn');
+        if (asnRow && asnEl) {
+            if (event.asn) {
+                asnRow.classList.remove('hidden');
+                asnEl.textContent = event.asn_org ? `AS${event.asn} (${event.asn_org})` : `AS${event.asn}`;
+            } else {
+                asnRow.classList.add('hidden');
+            }
+        }
+
+        // Attack Tags
+        const tagsRow = document.getElementById('tagsRow');
+        const tagsEl = document.getElementById('detailTags');
+        if (tagsRow && tagsEl) {
+            const tags = Array.isArray(event.tags) ? event.tags : [];
+            if (tags.length > 0) {
+                tagsRow.classList.remove('hidden');
+                tagsEl.innerHTML = tags
+                    .map(t => `<span class="tag-pill ${t.startsWith('scanner:') ? 'tag-scanner' : 'tag-alert'}">${this.escapeHtml(t)}</span>`)
+                    .join('');
+            } else {
+                tagsRow.classList.add('hidden');
+                tagsEl.innerHTML = '';
+            }
+        }
+
         // Request (contains method, path, headers)
         const requestEl = document.getElementById('detailRequest');
         if (event.request) {
@@ -250,6 +326,22 @@ class HoneypotDashboard {
             }
         } else {
             payloadSection.style.display = 'none';
+        }
+
+        // Extracted IOCs
+        const iocsSection = document.getElementById('iocsSection');
+        const iocsEl = document.getElementById('detailIocs');
+        if (iocsSection && iocsEl) {
+            const iocs = Array.isArray(event.iocs) ? event.iocs : [];
+            if (iocs.length > 0) {
+                iocsSection.classList.remove('hidden');
+                iocsEl.innerHTML = iocs
+                    .map(i => `<div class="flex items-start gap-2"><span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 uppercase text-[10px]">${this.escapeHtml(i.ioc_type)}</span><span class="break-all">${this.escapeHtml(window.defangValue ? window.defangValue(i.value) : i.value)}</span></div>`)
+                    .join('');
+            } else {
+                iocsSection.classList.add('hidden');
+                iocsEl.innerHTML = '';
+            }
         }
 
         this.modalOverlay.classList.add('active');
@@ -508,7 +600,7 @@ function addAttackDot(lat, lon, ip, service) {
 
         // Update popup content
         const uniqueIps = Array.from(markerData.ips).slice(-5); // Show last 5 IPs
-        const ipList = uniqueIps.map(ip => `<div style="font-family: monospace; font-size: 12px;">${ip}</div>`).join('');
+        const ipList = uniqueIps.map(uip => `<div style="font-family: monospace; font-size: 12px;">${escapeHtml(uip)}</div>`).join('');
         const moreText = markerData.ips.size > 5 ? `<div style="color: #888; font-size: 11px;">+${markerData.ips.size - 5} more</div>` : '';
 
         markerData.marker.setPopupContent(`
@@ -529,6 +621,8 @@ function addAttackDot(lat, lon, ip, service) {
     }
 
     // Create new circleMarker (SVG-based, positions correctly at all zoom levels)
+    const safeIp = escapeHtml(ip);
+    const safeService = escapeHtml(service);
     const marker = L.circleMarker([lat, lon], {
         radius: 3,               // Smaller initial size (was 4)
         fillColor: '#ef4444',
@@ -538,8 +632,8 @@ function addAttackDot(lat, lon, ip, service) {
         opacity: 0.8,
         className: 'attack-circle-marker'
     })
-        .bindPopup(`<div style="font-family: inherit"><strong>${ip}</strong><br><span style="color: #888">${service}</span></div>`)
-        .bindTooltip(`${ip} • ${service}`, { direction: 'top', offset: [0, -2], className: 'map-tooltip' })
+        .bindPopup(`<div style="font-family: inherit"><strong>${safeIp}</strong><br><span style="color: #888">${safeService}</span></div>`)
+        .bindTooltip(`${safeIp} • ${safeService}`, { direction: 'top', offset: [0, -2], className: 'map-tooltip' })
         .addTo(attackMap);
 
     // Apply entrance animation

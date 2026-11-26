@@ -14,6 +14,7 @@ use pnet::packet::ipv4::Ipv4Packet;
 use pnet::packet::icmp::{IcmpPacket, IcmpTypes};
 use pnet::packet::Packet;
 
+use crate::classifier;
 use crate::db::{AttackEvent, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
@@ -126,15 +127,13 @@ pub async fn start(event_bus: Arc<EventBus>, write_tx: WriteSender, geoip: Share
                                     request,
                                 );
                                 event = event.with_request_size(packet_size);
-                                
-                                // Add GeoIP info
-                                if let Some(loc) = geoip_clone.lookup(&ip) {
-                                    event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
-                                }
-                                
-                                // Send to write buffer (non-blocking) and broadcast
-                                let _ = write_tx_clone.send(event.clone());
-                                event_bus_clone.publish(event);
+
+                                classifier::record_event(
+                                    event,
+                                    &geoip_clone,
+                                    &write_tx_clone,
+                                    &event_bus_clone,
+                                );
                             }
                         }
                     }

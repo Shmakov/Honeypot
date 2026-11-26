@@ -1,322 +1,261 @@
-//! SSH honeypot handler using russh for proper protocol implementation
-//! Accepts all authentication and provides a fake interactive shell to capture commands
+//! SSH honeypot handler using russh with custom server banner, client banner capture,
+//! stateful virtual filesystem shell, IOC extraction, and per-IP concurrency limits.
 
 use anyhow::Result;
+use std::borrow::Cow;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info};
+use tokio::net::TcpListener;
+use tracing::{debug, info, warn};
 
-use russh::server::{Auth, ChannelOpenHandle, Config, Handler, Msg, PublicKeyOffer, Server, Session, VerifiedPublicKey};
-use russh::{Channel, ChannelId, ChannelOpenFailure, Pty};
 use russh::keys::{HashAlg, PrivateKey};
+use russh::server::{
+    Auth, ChannelOpenHandle, Config, Handler, Msg, PublicKeyOffer, Session, VerifiedPublicKey,
+};
+use russh::{Channel, ChannelId, ChannelOpenFailure, Pty, SshId};
 
+use crate::classifier;
 use crate::config::Config as AppConfig;
 use crate::db::{AttackEvent, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
+use crate::handlers::shell_fs::FakeShell;
+use crate::ioc::IocItem;
+use crate::limits::{ConnectionLimiter, ConnectionPermit};
 
-/// Maximum line buffer size (4KB) to prevent memory exhaustion
 const MAX_LINE_BUFFER: usize = 4096;
-/// Maximum channels per session to prevent resource abuse
 const MAX_CHANNELS_PER_SESSION: usize = 5;
-/// Maximum commands before auto-disconnect
 const MAX_COMMANDS: usize = 100;
 
-/// SSH honeypot server
-struct SshServer {
-    event_bus: Arc<EventBus>,
-    write_tx: WriteSender,
-    geoip: SharedGeoIp,
-}
-
-impl russh::server::Server for SshServer {
-    type Handler = SshSession;
-
-    fn new_client(&mut self, addr: Option<SocketAddr>) -> Self::Handler {
-        let ip = addr.map(|a| a.ip().to_string()).unwrap_or_else(|| "unknown".to_string());
-        debug!("SSH connection from {}", ip);
-        
-        SshSession {
-            ip,
-            event_bus: self.event_bus.clone(),
-            write_tx: self.write_tx.clone(),
-            geoip: self.geoip.clone(),
-            username: None,
-            auth_method: None,
-            channels: HashMap::new(),
-        }
-    }
-
-    fn handle_session_error(&mut self, error: <Self::Handler as Handler>::Error) {
-        debug!("SSH session error: {:?}", error);
-    }
-}
-
-/// Channel state for tracking shell sessions
 struct ChannelState {
     line_buffer: String,
     commands: Vec<String>,
+    iocs: Vec<IocItem>,
+    canary_triggered: bool,
     shell_active: bool,
+    logged: bool,
+    shell: FakeShell,
 }
 
-impl Default for ChannelState {
-    fn default() -> Self {
+impl ChannelState {
+    fn new(hostname: &str, persona: &str, username: &str) -> Self {
         Self {
             line_buffer: String::new(),
             commands: Vec::new(),
+            iocs: Vec::new(),
+            canary_triggered: false,
             shell_active: false,
+            logged: false,
+            shell: FakeShell::new(hostname, persona, username),
         }
     }
 }
 
-/// SSH session handler - accepts all auth, provides fake shell
+struct PendingAuth {
+    username: String,
+    method: String,
+    detail: String,
+    password: Option<String>,
+}
+
 struct SshSession {
     ip: String,
+    port: u16,
+    service: String,
+    hostname: String,
+    persona: String,
     event_bus: Arc<EventBus>,
     write_tx: WriteSender,
     geoip: SharedGeoIp,
     username: Option<String>,
-    auth_method: Option<String>,
+    client_banner: Option<String>,
+    pending_auth: Option<PendingAuth>,
     channels: HashMap<ChannelId, ChannelState>,
+    _permit: ConnectionPermit,
 }
 
 impl SshSession {
-    /// Log credentials to write buffer and event bus
-    fn log_auth_event(&self, username: &str, auth_detail: &str) {
-        let request = format!("SSH auth ({}): {} from {}", 
-            self.auth_method.as_deref().unwrap_or("unknown"), 
-            auth_detail, 
-            self.ip
-        );
-        
-        let request_size = (username.len() + auth_detail.len() + 50) as u32;
-        
+    fn flush_pending_auth(&mut self) {
+        let Some(auth) = self.pending_auth.take() else {
+            return;
+        };
+        let request = format!("SSH auth ({}): {} from {}", auth.method, auth.detail, self.ip);
+        let request_size = (auth.username.len() + auth.detail.len() + 50) as u32;
+
         let mut event = AttackEvent::new(
             self.ip.clone(),
-            "ssh".to_string(),
-            22,
+            self.service.clone(),
+            self.port,
             request,
         );
-        
-        // For password auth, store credentials
-        if self.auth_method.as_deref() == Some("password") {
-            if let Some(password) = auth_detail.strip_prefix(&format!("{}:", username)) {
-                event = event.with_credentials(username.to_string(), password.to_string());
-            }
+        if let Some(pwd) = auth.password {
+            event = event.with_credentials(auth.username, pwd);
         }
-        
+        if let Some(ref ua) = self.client_banner {
+            event = event.with_user_agent(ua.clone());
+        }
         event = event.with_request_size(request_size);
-        
-        if let Some(loc) = self.geoip.lookup(&self.ip) {
-            event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
-        }
-        
-        let _ = self.write_tx.send(event.clone());
-        self.event_bus.publish(event);
-        
-        info!("SSH auth ({}): {} from {}", 
-            self.auth_method.as_deref().unwrap_or("unknown"),
-            auth_detail, 
-            self.ip
+
+        classifier::record_event(event, &self.geoip, &self.write_tx, &self.event_bus);
+        info!(
+            "SSH auth ({}) on port {}: {} from {}",
+            auth.method, self.port, auth.detail, self.ip
         );
     }
 
-    /// Log commands when session ends or periodically
-    fn log_commands(&self, channel: ChannelId) {
-        if let Some(state) = self.channels.get(&channel) {
-            if state.commands.is_empty() {
-                return;
-            }
-            
-            let commands_str = state.commands.join("\n");
-            let request = format!("SSH shell commands from {} (user: {})", 
-                self.ip, 
-                self.username.as_deref().unwrap_or("unknown")
-            );
-            
-            let request_size = commands_str.len() as u32;
-            
-            let mut event = AttackEvent::new(
-                self.ip.clone(),
-                "ssh".to_string(),
-                22,
-                request,
-            );
-            
-            event = event.with_payload(commands_str.as_bytes().to_vec());
-            event = event.with_request_size(request_size);
-            
-            if let Some(loc) = self.geoip.lookup(&self.ip) {
-                event = event.with_geo(loc.country_code, loc.latitude, loc.longitude);
-            }
-            
-            let _ = self.write_tx.send(event.clone());
-            self.event_bus.publish(event);
-            
-            info!("SSH commands from {}: {:?}", self.ip, state.commands);
+    fn log_commands(&mut self, channel: ChannelId) {
+        let Some(state) = self.channels.get_mut(&channel) else {
+            return;
+        };
+        if state.logged || state.commands.is_empty() {
+            return;
         }
-    }
+        state.logged = true;
 
-    /// Generate fake output for a command (static to avoid borrow checker issues)
-    fn generate_fake_output(cmd: &str) -> String {
-        let cmd_lower = cmd.trim().to_lowercase();
-        let cmd_parts: Vec<&str> = cmd_lower.split_whitespace().collect();
-        let base_cmd = cmd_parts.first().map(|s| *s).unwrap_or("");
-        
-        match base_cmd {
-            "whoami" => "root\r\n".to_string(),
-            "id" => "uid=0(root) gid=0(root) groups=0(root)\r\n".to_string(),
-            "pwd" => "/root\r\n".to_string(),
-            "hostname" => "honeypot\r\n".to_string(),
-            "uname" => {
-                if cmd_lower.contains("-a") {
-                    "Linux honeypot 5.15.0-generic #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux\r\n".to_string()
-                } else {
-                    "Linux\r\n".to_string()
-                }
-            }
-            "uptime" => " 12:34:56 up 42 days,  3:21,  1 user,  load average: 0.00, 0.01, 0.05\r\n".to_string(),
-            "w" => " 12:34:56 up 42 days,  3:21,  1 user,  load average: 0.00, 0.01, 0.05\r\nUSER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT\r\nroot     pts/0    -                12:34    0.00s  0.00s  0.00s w\r\n".to_string(),
-            "ls" => {
-                if cmd_lower.contains("/etc") {
-                    "passwd\r\nshadow\r\nhosts\r\nresolv.conf\r\nssh\r\n".to_string()
-                } else if cmd_lower.contains("-la") || cmd_lower.contains("-al") {
-                    "total 32\r\ndrwx------  4 root root 4096 Dec 20 10:00 .\r\ndrwxr-xr-x 18 root root 4096 Dec 15 08:00 ..\r\n-rw-------  1 root root  512 Dec 20 10:00 .bash_history\r\n-rw-r--r--  1 root root 3106 Dec 15 08:00 .bashrc\r\ndrwxr-xr-x  2 root root 4096 Dec 15 08:00 .ssh\r\n".to_string()
-                } else {
-                    ".bash_history  .bashrc  .ssh\r\n".to_string()
-                }
-            }
-            "cat" => {
-                if cmd_lower.contains("/etc/passwd") {
-                    "root:x:0:0:root:/root:/bin/bash\r\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\r\nbin:x:2:2:bin:/bin:/usr/sbin/nologin\r\nsys:x:3:3:sys:/dev:/usr/sbin/nologin\r\nnobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin\r\n".to_string()
-                } else if cmd_lower.contains("/etc/shadow") {
-                    "cat: /etc/shadow: Permission denied\r\n".to_string()
-                } else {
-                    "cat: No such file or directory\r\n".to_string()
-                }
-            }
-            "ps" => "  PID TTY          TIME CMD\r\n    1 ?        00:00:03 systemd\r\n  942 ?        00:00:00 sshd\r\n 1337 pts/0    00:00:00 bash\r\n 1338 pts/0    00:00:00 ps\r\n".to_string(),
-            "netstat" | "ss" => "Netstat exec failed: No such file or directory\r\n".to_string(),
-            "ifconfig" => "eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\r\n        inet 10.0.0.1  netmask 255.255.255.0  broadcast 10.0.0.255\r\n".to_string(),
-            "ip" => {
-                if cmd_lower.contains("addr") || cmd_lower.contains("a") {
-                    "1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536\r\n    inet 127.0.0.1/8 scope host lo\r\n2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\r\n    inet 10.0.0.1/24 brd 10.0.0.255 scope global eth0\r\n".to_string()
-                } else {
-                    "Usage: ip [ OPTIONS ] OBJECT\r\n".to_string()
-                }
-            }
-            "curl" | "wget" => {
-                format!("bash: {}: command not found\r\n", base_cmd)
-            }
-            "cd" => String::new(), // Silent success
-            "echo" => {
-                let output = cmd.trim().strip_prefix("echo").unwrap_or("").trim();
-                format!("{}\r\n", output)
-            }
-            "exit" | "quit" | "logout" => String::new(), // Handled specially
-            "help" => "GNU bash, version 5.1.16\r\nType 'help' to see this list.\r\n".to_string(),
-            "history" => "    1  ls -la\r\n    2  cat /etc/passwd\r\n    3  whoami\r\n".to_string(),
-            "env" | "printenv" => "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\r\nHOME=/root\r\nUSER=root\r\nSHELL=/bin/bash\r\n".to_string(),
-            "" => String::new(),
-            _ => format!("bash: {}: command not found\r\n", base_cmd),
+        let commands_str = state.commands.join("\n");
+        let request = format!(
+            "SSH shell commands from {} (user: {})",
+            self.ip,
+            self.username.as_deref().unwrap_or("unknown")
+        );
+        let request_size = commands_str.len() as u32;
+
+        let mut event = AttackEvent::new(
+            self.ip.clone(),
+            self.service.clone(),
+            self.port,
+            request,
+        );
+        event = event
+            .with_payload(commands_str.as_bytes().to_vec())
+            .with_request_size(request_size);
+
+        if let Some(ref ua) = self.client_banner {
+            event = event.with_user_agent(ua.clone());
         }
-    }
+        if !state.iocs.is_empty() {
+            event = event.with_iocs(state.iocs.clone());
+        }
+        if state.canary_triggered {
+            event = event.with_tag("canary-triggered");
+        }
 
-    /// Get the shell prompt
-    fn get_prompt(&self) -> String {
-        format!("root@honeypot:~# ")
+        classifier::record_event(event, &self.geoip, &self.write_tx, &self.event_bus);
+        info!(
+            "SSH commands on port {} from {}: {:?}",
+            self.port, self.ip, state.commands
+        );
+    }
+}
+
+impl Drop for SshSession {
+    fn drop(&mut self) {
+        self.flush_pending_auth();
+        let ids: Vec<ChannelId> = self.channels.keys().copied().collect();
+        for ch in ids {
+            self.log_commands(ch);
+        }
     }
 }
 
 impl Handler for SshSession {
     type Error = anyhow::Error;
 
-    /// Accept password authentication - capture credentials
     async fn auth_password(
         &mut self,
         user: &str,
         password: &str,
     ) -> Result<Auth, Self::Error> {
         debug!("SSH auth_password: {}:{} from {}", user, password, self.ip);
-        
         self.username = Some(user.to_string());
-        self.auth_method = Some("password".to_string());
-        
-        // Log credentials
-        self.log_auth_event(user, &format!("{}:{}", user, password));
-        
-        // Accept authentication - this is a honeypot!
+        self.pending_auth = Some(PendingAuth {
+            username: user.to_string(),
+            method: "password".to_string(),
+            detail: format!("{}:{}", user, password),
+            password: Some(password.to_string()),
+        });
         Ok(Auth::Accept)
     }
 
-    /// Accept "none" authentication
-    async fn auth_none(
-        &mut self,
-        user: &str,
-    ) -> Result<Auth, Self::Error> {
+    async fn auth_none(&mut self, user: &str) -> Result<Auth, Self::Error> {
         debug!("SSH auth_none from {} as '{}'", self.ip, user);
         self.username = Some(user.to_string());
-        self.auth_method = Some("none".to_string());
-        
-        self.log_auth_event(user, user);
-        
-        // Accept - let them in!
+        self.pending_auth = Some(PendingAuth {
+            username: user.to_string(),
+            method: "none".to_string(),
+            detail: user.to_string(),
+            password: None,
+        });
         Ok(Auth::Accept)
     }
 
-    /// Accept public key authentication - log the key fingerprint
     async fn auth_publickey(
         &mut self,
         user: &str,
         key: VerifiedPublicKey<'_>,
     ) -> Result<Auth, Self::Error> {
         let fingerprint = key.public_key.fingerprint(HashAlg::Sha256);
-        debug!("SSH auth_publickey from {} as '{}' with key {}", self.ip, user, fingerprint);
-        
+        debug!(
+            "SSH auth_publickey from {} as '{}' with key {}",
+            self.ip, user, fingerprint
+        );
         self.username = Some(user.to_string());
-        self.auth_method = Some("publickey".to_string());
-        
-        self.log_auth_event(user, &format!("{}@{}", user, fingerprint));
-        
-        // Accept public key auth
+        self.pending_auth = Some(PendingAuth {
+            username: user.to_string(),
+            method: "publickey".to_string(),
+            detail: format!("{}@{}", user, fingerprint),
+            password: None,
+        });
         Ok(Auth::Accept)
     }
 
-    /// Accept public key offer (pre-signature check)
     async fn auth_publickey_offered(
         &mut self,
         user: &str,
         offer: PublicKeyOffer<'_>,
     ) -> Result<Auth, Self::Error> {
-        debug!("SSH publickey offered from {} as '{}': {}", self.ip, user, offer.public_key.fingerprint(HashAlg::Sha256));
-        // Accept the offered key - we'll log it when auth_publickey is called
+        debug!(
+            "SSH publickey offered from {} as '{}': {}",
+            self.ip,
+            user,
+            offer.public_key.fingerprint(HashAlg::Sha256)
+        );
         Ok(Auth::Accept)
     }
 
-    /// Accept session channel open
+    async fn auth_succeeded(&mut self, session: &mut Session) -> Result<(), Self::Error> {
+        let raw_sshid = String::from_utf8_lossy(session.remote_sshid())
+            .trim()
+            .to_string();
+        if !raw_sshid.is_empty() {
+            self.client_banner = Some(raw_sshid);
+        }
+        self.flush_pending_auth();
+        Ok(())
+    }
+
     async fn channel_open_session(
         &mut self,
         channel: Channel<Msg>,
         reply: ChannelOpenHandle,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        debug!("SSH channel_open_session from {}", self.ip);
-        
-        // Security: Limit channels per session
         if self.channels.len() >= MAX_CHANNELS_PER_SESSION {
             debug!("SSH channel limit reached for {}", self.ip);
-            reply.reject(ChannelOpenFailure::AdministrativelyProhibited).await;
+            let _ = reply.reject(ChannelOpenFailure::AdministrativelyProhibited).await;
             return Ok(());
         }
-        
-        self.channels.insert(channel.id(), ChannelState::default());
-        reply.accept().await;
+
+        let user = self.username.as_deref().unwrap_or("root");
+        self.channels.insert(
+            channel.id(),
+            ChannelState::new(&self.hostname, &self.persona, user),
+        );
+        let _ = reply.accept().await;
         Ok(())
     }
 
-    /// Accept PTY request
     async fn pty_request(
         &mut self,
         channel: ChannelId,
@@ -328,40 +267,26 @@ impl Handler for SshSession {
         _modes: &[(Pty, u32)],
         session: &mut Session,
     ) -> Result<(), Self::Error> {
-        debug!("SSH pty_request from {}", self.ip);
         let _ = session.channel_success(channel);
         Ok(())
     }
 
-    /// Handle shell request - send welcome and prompt
     async fn shell_request(
         &mut self,
         channel: ChannelId,
         session: &mut Session,
     ) -> Result<(), Self::Error> {
-        debug!("SSH shell_request from {}", self.ip);
-        
         if let Some(state) = self.channels.get_mut(&channel) {
             state.shell_active = true;
+            let banner = state.shell.welcome_banner(&self.ip);
+            let _ = session.data(channel, banner);
+            let prompt = state.shell.prompt();
+            let _ = session.data(channel, prompt);
         }
-        
-        // Send welcome banner
-        let banner = format!(
-            "Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-generic x86_64)\r\n\r\n * Documentation:  https://help.ubuntu.com\r\n * Management:     https://landscape.canonical.com\r\n * Support:        https://ubuntu.com/advantage\r\n\r\nLast login: {} from {}\r\n",
-            chrono::Local::now().format("%a %b %d %H:%M:%S %Y"),
-            self.ip
-        );
-        let _ = session.data(channel, banner);
-        
-        // Send prompt
-        let prompt = self.get_prompt();
-        let _ = session.data(channel, prompt);
-        
         let _ = session.channel_success(channel);
         Ok(())
     }
 
-    /// Handle exec request - single command execution
     async fn exec_request(
         &mut self,
         channel: ChannelId,
@@ -370,30 +295,35 @@ impl Handler for SshSession {
     ) -> Result<(), Self::Error> {
         let command = String::from_utf8_lossy(data).to_string();
         debug!("SSH exec_request from {}: {}", self.ip, command);
-        
-        // Store command
-        if let Some(state) = self.channels.get_mut(&channel) {
+
+        let output = if let Some(state) = self.channels.get_mut(&channel) {
             state.commands.push(command.clone());
-        }
-        
-        // Generate and send fake output
-        let output = Self::generate_fake_output(&command);
+            let res = state.shell.execute_line(&command);
+            if res.canary_triggered {
+                state.canary_triggered = true;
+            }
+            for item in res.extracted_iocs {
+                if !state.iocs.iter().any(|e| e == &item) {
+                    state.iocs.push(item);
+                }
+            }
+            res.output
+        } else {
+            String::new()
+        };
+
         if !output.is_empty() {
             let _ = session.data(channel, output);
         }
-        
-        // Log commands immediately for exec requests
+
         self.log_commands(channel);
-        
-        // Send exit status and close
+
         let _ = session.exit_status_request(channel, 0);
         let _ = session.channel_success(channel);
         let _ = session.close(channel);
-        
         Ok(())
     }
 
-    /// Handle data from client - interactive shell input
     async fn data(
         &mut self,
         channel: ChannelId,
@@ -401,186 +331,234 @@ impl Handler for SshSession {
         session: &mut Session,
     ) -> Result<(), Self::Error> {
         let input = String::from_utf8_lossy(data);
-        debug!("SSH data from {}: {:?}", self.ip, input);
-        
         let mut should_close = false;
-        
+
         if let Some(state) = self.channels.get_mut(&channel) {
             for ch in input.chars() {
                 match ch {
                     '\r' | '\n' => {
-                        // Echo newline
                         let _ = session.data(channel, "\r\n");
-                        
                         let cmd = state.line_buffer.trim().to_string();
+                        state.line_buffer.clear();
+
                         if !cmd.is_empty() {
                             state.commands.push(cmd.clone());
-                            
-                            // Check for exit commands
-                            let cmd_lower = cmd.to_lowercase();
-                            if cmd_lower == "exit" || cmd_lower == "quit" || cmd_lower == "logout" {
-                                should_close = true;
-                            } else {
-                                // Generate and send fake output
-                                let output = Self::generate_fake_output(&cmd);
-                                if !output.is_empty() {
-                                    let _ = session.data(channel, output);
+                            let res = state.shell.execute_line(&cmd);
+                            if res.canary_triggered {
+                                state.canary_triggered = true;
+                            }
+                            for item in res.extracted_iocs {
+                                if !state.iocs.iter().any(|e| e == &item) {
+                                    state.iocs.push(item);
                                 }
                             }
+                            if !res.output.is_empty() {
+                                let _ = session.data(channel, res.output);
+                            }
+                            if res.should_exit {
+                                should_close = true;
+                                break;
+                            }
                         }
-                        
-                        state.line_buffer.clear();
-                        
+
                         if !should_close {
-                            // Send new prompt
-                            let _ = session.data(channel, "root@honeypot:~# ");
+                            let prompt = state.shell.prompt();
+                            let _ = session.data(channel, prompt);
                         }
                     }
                     '\x7f' | '\x08' => {
-                        // Backspace
                         if !state.line_buffer.is_empty() {
                             state.line_buffer.pop();
-                            // Echo backspace sequence
                             let _ = session.data(channel, "\x08 \x08");
                         }
                     }
                     '\x03' => {
-                        // Ctrl+C
                         let _ = session.data(channel, "^C\r\n");
                         state.line_buffer.clear();
-                        let _ = session.data(channel, "root@honeypot:~# ");
+                        let prompt = state.shell.prompt();
+                        let _ = session.data(channel, prompt);
                     }
                     '\x04' => {
-                        // Ctrl+D - logout
                         let _ = session.data(channel, "\r\nlogout\r\n");
                         should_close = true;
+                        break;
                     }
                     _ if ch.is_ascii() && !ch.is_control() => {
-                        // Regular character - add to buffer and echo
-                        // Security: Limit line buffer size
                         if state.line_buffer.len() < MAX_LINE_BUFFER {
                             state.line_buffer.push(ch);
                             let _ = session.data(channel, ch.to_string());
                         }
-                        // Silently ignore characters beyond limit
                     }
-                    _ => {
-                        // Ignore other control characters
-                    }
+                    _ => {}
                 }
             }
-            
-            // Security: Limit command count
+
             if state.commands.len() >= MAX_COMMANDS {
                 should_close = true;
             }
         }
-        
+
         if should_close {
             self.log_commands(channel);
             let _ = session.exit_status_request(channel, 0);
             let _ = session.close(channel);
         }
-        
+
         Ok(())
     }
 
-    /// Handle channel close
     async fn channel_close(
         &mut self,
         channel: ChannelId,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        debug!("SSH channel_close from {}", self.ip);
         self.log_commands(channel);
         self.channels.remove(&channel);
         Ok(())
     }
 
-    /// Handle channel EOF
     async fn channel_eof(
         &mut self,
         channel: ChannelId,
         _session: &mut Session,
     ) -> Result<(), Self::Error> {
-        debug!("SSH channel_eof from {}", self.ip);
         self.log_commands(channel);
         Ok(())
     }
 }
 
-/// Generate or load SSH host key
 fn get_or_create_host_key(key_path: &str) -> Result<PrivateKey> {
-    use std::path::Path;
-    use std::fs;
     use russh::keys::Algorithm;
-    
+    use std::fs;
+    use std::path::Path;
+
     let path = Path::new(key_path);
-    
     if path.exists() {
         debug!("Loading SSH host key from {}", key_path);
-        let key = PrivateKey::read_openssh_file(path)
-            .map_err(|e| anyhow::anyhow!("Failed to load SSH key: {}", e))?;
-        Ok(key)
+        PrivateKey::read_openssh_file(path)
+            .map_err(|e| anyhow::anyhow!("Failed to load SSH key: {}", e))
     } else {
         info!("Generating new SSH host key at {}", key_path);
-        
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        
         let mut rng = rand::rng();
         let key = PrivateKey::random(&mut rng, Algorithm::Ed25519)
             .map_err(|e| anyhow::anyhow!("Failed to generate SSH key: {}", e))?;
-        
         key.write_openssh_file(path, russh::keys::ssh_key::LineEnding::LF)
             .map_err(|e| anyhow::anyhow!("Failed to save SSH key: {}", e))?;
-        
         Ok(key)
     }
 }
 
-/// Start the SSH honeypot server
+pub fn build_ssh_config(banner: &str, host_key: PrivateKey) -> Arc<Config> {
+    let clean_banner = banner.trim();
+    let server_id = if clean_banner.starts_with("SSH-") {
+        SshId::Standard(Cow::Owned(clean_banner.to_string()))
+    } else {
+        SshId::Standard(Cow::Borrowed("SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.4"))
+    };
+
+    Arc::new(Config {
+        server_id,
+        inactivity_timeout: Some(Duration::from_secs(300)),
+        auth_rejection_time: Duration::from_secs(1),
+        auth_rejection_time_initial: Some(Duration::from_secs(0)),
+        keys: vec![host_key],
+        ..Default::default()
+    })
+}
+
+/// Start the SSH honeypot server on `port`
 pub async fn start(
     port: u16,
+    service: &str,
     config: Arc<AppConfig>,
     event_bus: Arc<EventBus>,
     write_tx: WriteSender,
     geoip: SharedGeoIp,
+    limiter: Arc<ConnectionLimiter>,
 ) -> Result<()> {
     let key_path = "data/ssh_host_key";
-    
     let host_key = match get_or_create_host_key(key_path) {
         Ok(key) => key,
         Err(e) => {
-            tracing::warn!("Failed to load/generate SSH host key: {}. Generating in-memory key.", e);
+            warn!(
+                "Failed to load/generate SSH host key: {}. Generating in-memory key.",
+                e
+            );
             let mut rng = rand::rng();
             PrivateKey::random(&mut rng, russh::keys::Algorithm::Ed25519)
                 .expect("Failed to generate in-memory SSH key")
         }
     };
 
-    let ssh_config = Config {
-        inactivity_timeout: Some(Duration::from_secs(300)),
-        auth_rejection_time: Duration::from_secs(1),
-        auth_rejection_time_initial: Some(Duration::from_secs(0)),
-        keys: vec![host_key],
-        ..Default::default()
-    };
-
-    let ssh_config = Arc::new(ssh_config);
-    
-    let mut server = SshServer {
-        event_bus,
-        write_tx,
-        geoip,
-    };
-
+    let ssh_config = build_ssh_config(&config.emulation.ssh_banner, host_key);
     let addr = format!("{}:{}", config.server.host, port);
-    
-    info!("SSH honeypot starting on {} (fake shell enabled)", addr);
-    
-    server.run_on_address(ssh_config, &addr).await?;
+    let listener = match TcpListener::bind(&addr).await {
+        Ok(l) => l,
+        Err(e) => {
+            warn!("Cannot bind SSH to {}: {} - skipping", addr, e);
+            return Ok(());
+        }
+    };
 
-    Ok(())
+    info!(
+        "SSH honeypot started on {} ({}, banner: {})",
+        addr, service, config.emulation.ssh_banner
+    );
+
+    let service = service.to_string();
+    loop {
+        match listener.accept().await {
+            Ok((socket, peer_addr)) => {
+                let ip = peer_addr.ip().to_string();
+                let Some(permit) = limiter.try_acquire(&ip) else {
+                    debug!("SSH connection rejected (rate/concurrency limit) from {}", ip);
+                    drop(socket);
+                    continue;
+                };
+
+                let ssh_config = ssh_config.clone();
+                let service = service.clone();
+                let hostname = config.emulation.hostname.clone();
+                let persona = config.emulation.persona.clone();
+                let event_bus = event_bus.clone();
+                let write_tx = write_tx.clone();
+                let geoip = geoip.clone();
+
+                tokio::spawn(async move {
+                    let handler = SshSession {
+                        ip: ip.clone(),
+                        port,
+                        service,
+                        hostname,
+                        persona,
+                        event_bus,
+                        write_tx,
+                        geoip,
+                        username: None,
+                        client_banner: None,
+                        pending_auth: None,
+                        channels: HashMap::new(),
+                        _permit: permit,
+                    };
+
+                    match russh::server::run_stream(ssh_config, socket, handler).await {
+                        Ok(session) => {
+                            if let Err(e) = session.await {
+                                debug!("SSH session ended for {}: {:?}", ip, e);
+                            }
+                        }
+                        Err(e) => {
+                            debug!("SSH handshake error from {}: {:?}", ip, e);
+                        }
+                    }
+                });
+            }
+            Err(e) => {
+                warn!("SSH accept error on port {}: {}", port, e);
+            }
+        }
+    }
 }

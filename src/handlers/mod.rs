@@ -1,10 +1,18 @@
 //! Protocol handlers module
 
-pub mod tcp;
-pub mod ssh;
 pub mod ftp;
-pub mod telnet;
+pub mod http_api;
 pub mod icmp;
+pub mod mysql;
+pub mod postgres;
+pub mod rdp;
+pub mod redis;
+pub mod shell_fs;
+pub mod smtp;
+pub mod ssh;
+pub mod tcp;
+pub mod telnet;
+pub mod udp;
 
 use anyhow::Result;
 use std::sync::Arc;
@@ -14,6 +22,7 @@ use crate::config::Config;
 use crate::db::{Database, WriteSender};
 use crate::events::EventBus;
 use crate::geoip::SharedGeoIp;
+use crate::limits::ConnectionLimiter;
 
 /// TCP ports to listen on (excludes 80/443 used by web server)
 /// 1024+ ports based on nmap's top scanned ports and common attack targets
@@ -132,7 +141,7 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
     (2191, "tvbus"), (2196, "unknown"), (2200, "ici"),
     (2223, "rockwell-csp2"), (2232, "ivs-video"), (2241, "ivsd"),
     (2260, "apc-2260"), (2288, "netml"), (2301, "cpq-wbem"),
-    (2323, "3d-nfsd"), (2366, "qip-login"), (2375, "docker"),
+    (2323, "telnet-alt"), (2366, "qip-login"), (2375, "docker"),
     (2376, "docker-tls"), (2379, "etcd-client"), (2380, "etcd-server"),
     (2381, "compaq-https"), (2382, "ms-olap3"), (2383, "ms-olap4"),
     (2393, "ms-olap1"), (2394, "ms-olap2"), (2399, "fmpro-fdal"),
@@ -301,7 +310,7 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
     (10616, "unknown"), (10617, "unknown"), (10621, "unknown"),
     (10626, "unknown"), (10628, "unknown"), (10629, "unknown"),
     (11110, "unknown"), (11111, "vce"), (11211, "memcached"),
-    (11235, "unknown"), (11300, "beanstalkd"), (11967, "unknown"),
+    (11235, "unknown"), (11300, "beanstalkd"), (11434, "ollama"), (11967, "unknown"),
     (12000, "cce4x"), (12174, "unknown"), (12265, "unknown"),
     (12345, "netbus"), (13456, "unknown"), (13722, "netbackup"),
     (13782, "netbackup2"), (13783, "vopied"), (14000, "scotty-ft"),
@@ -356,12 +365,18 @@ pub const TCP_PORTS: &[(u16, &str)] = &[
 ];
 
 /// Start all protocol handlers with async write buffer
-pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip: SharedGeoIp, write_tx: WriteSender) -> Result<()> {
+pub async fn start_all(
+    config: &Config,
+    event_bus: EventBus,
+    db: Database,
+    geoip: SharedGeoIp,
+    write_tx: WriteSender,
+    limiter: Arc<ConnectionLimiter>,
+) -> Result<()> {
     let config = Arc::new(config.clone());
     let event_bus = Arc::new(event_bus);
-    let _db = Arc::new(db.clone()); // Keep for future use, handlers use write_tx
+    let _db = Arc::new(db.clone());
 
-    // Determine max ports from config (0 means all ports)
     let max_ports = if config.server.max_ports == 0 {
         TCP_PORTS.len()
     } else {
@@ -369,12 +384,15 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip
     };
 
     let ports_to_start = &TCP_PORTS[..max_ports.min(TCP_PORTS.len())];
-    
+
     if ports_to_start.len() < TCP_PORTS.len() {
-        info!("Starting {} of {} ports (set server.max_ports to change)", ports_to_start.len(), TCP_PORTS.len());
+        info!(
+            "Starting {} of {} ports (set server.max_ports to change)",
+            ports_to_start.len(),
+            TCP_PORTS.len()
+        );
     }
 
-    // Start TCP listeners for each port (skip 80/443 as those will be web server)
     for (port, service) in ports_to_start {
         let port = *port;
         let service = service.to_string();
@@ -382,31 +400,49 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip
         let event_bus = event_bus.clone();
         let write_tx = write_tx.clone();
         let geoip = geoip.clone();
+        let limiter = limiter.clone();
 
         tokio::spawn(async move {
-            match service.as_str() {
+            let res = match service.as_str() {
                 "ssh" | "ssh-alt" => {
-                    if let Err(e) = ssh::start(port, config, event_bus, write_tx, geoip).await {
-                        tracing::debug!("SSH handler on port {} failed: {}", port, e);
-                    }
+                    ssh::start(port, &service, config, event_bus, write_tx, geoip, limiter).await
                 }
-                "ftp" => {
-                    if let Err(e) = ftp::start(port, config, event_bus, write_tx, geoip).await {
-                        tracing::debug!("FTP handler on port {} failed: {}", port, e);
-                    }
+                "ftp" => ftp::start(port, config, event_bus, write_tx, geoip, limiter).await,
+                "telnet" | "telnet-alt" => {
+                    telnet::start(port, &service, config, event_bus, write_tx, geoip, limiter).await
                 }
-                "telnet" => {
-                    if let Err(e) = telnet::start(port, config, event_bus, write_tx, geoip).await {
-                        tracing::debug!("Telnet handler on port {} failed: {}", port, e);
-                    }
+                "redis" => redis::start(port, config, event_bus, write_tx, geoip, limiter).await,
+                "smtp" | "submission" => {
+                    smtp::start(port, &service, config, event_bus, write_tx, geoip, limiter).await
                 }
-                _ => {
-                    if let Err(e) = tcp::start(port, &service, config, event_bus, write_tx, geoip).await {
-                        tracing::debug!("{} handler on port {} failed: {}", service, port, e);
-                    }
+                "mysql" | "mysql-alt" => {
+                    mysql::start(port, &service, config, event_bus, write_tx, geoip, limiter).await
                 }
+                "postgresql" | "postgresql-alt" => {
+                    postgres::start(port, &service, config, event_bus, write_tx, geoip, limiter)
+                        .await
+                }
+                "rdp" => rdp::start(port, &service, config, event_bus, write_tx, geoip, limiter).await,
+                "docker" | "elasticsearch" | "ollama" => {
+                    http_api::start(port, &service, config, event_bus, write_tx, geoip, limiter)
+                        .await
+                }
+                _ => tcp::start(port, &service, config, event_bus, write_tx, geoip, limiter).await,
+            };
+
+            if let Err(e) = res {
+                tracing::debug!("{} handler on port {} failed: {}", service, port, e);
             }
         });
+    }
+
+    if config.limits.udp_enabled {
+        udp::start_all(
+            config.clone(),
+            event_bus.clone(),
+            write_tx.clone(),
+            geoip.clone(),
+        );
     }
 
     // ICMP handler (optional, requires CAP_NET_RAW)
@@ -419,7 +455,10 @@ pub async fn start_all(config: &Config, event_bus: EventBus, db: Database, geoip
         }
     });
 
-    info!("Started {} protocol handlers with async write buffer", ports_to_start.len());
+    info!(
+        "Started {} TCP protocol handlers with concurrency limits and async write buffer",
+        ports_to_start.len()
+    );
     Ok(())
 }
 
