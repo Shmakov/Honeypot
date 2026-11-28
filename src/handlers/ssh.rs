@@ -13,7 +13,7 @@ use russh::keys::{HashAlg, PrivateKey};
 use russh::server::{
     Auth, ChannelOpenHandle, Config, Handler, Msg, PublicKeyOffer, Session, VerifiedPublicKey,
 };
-use russh::{Channel, ChannelId, ChannelOpenFailure, Pty, SshId};
+use russh::{Channel, ChannelId, ChannelOpenFailure, MethodKind, MethodSet, Pty, SshId};
 
 use crate::classifier;
 use crate::config::Config as AppConfig;
@@ -179,15 +179,14 @@ impl Handler for SshSession {
     }
 
     async fn auth_none(&mut self, user: &str) -> Result<Auth, Self::Error> {
-        debug!("SSH auth_none from {} as '{}'", self.ip, user);
+        debug!("SSH auth_none from {} as '{}' (prompting password/publickey)", self.ip, user);
         self.username = Some(user.to_string());
-        self.pending_auth = Some(PendingAuth {
-            username: user.to_string(),
-            method: "none".to_string(),
-            detail: user.to_string(),
-            password: None,
-        });
-        Ok(Auth::Accept)
+        Ok(Auth::Reject {
+            proceed_with_methods: Some(MethodSet::from(
+                &[MethodKind::Password, MethodKind::PublicKey][..],
+            )),
+            partial_success: false,
+        })
     }
 
     async fn auth_publickey(

@@ -22,6 +22,109 @@ const DO: u8 = 253;
 const DONT: u8 = 254;
 const SB: u8 = 250;
 const SE: u8 = 240;
+const MAX_LINE: usize = 4096;
+
+enum TelnetReadResult {
+    Line(String, usize),
+    BinaryProbe(usize),
+    Eof(usize),
+}
+
+fn is_binary_byte(byte: u8) -> bool {
+    matches!(
+        byte,
+        0x01..=0x02 | 0x05..=0x07 | 0x0b..=0x0c | 0x0e..=0x1a | 0x1c..=0x1f | 0x80..=0xfe
+    )
+}
+
+pub(crate) fn is_http_header_line(line: &str) -> bool {
+    let lower = line.trim().to_ascii_lowercase();
+    const PREFIXES: &[&str] = &[
+        "host:",
+        "user-agent:",
+        "accept:",
+        "accept-encoding:",
+        "accept-language:",
+        "connection:",
+        "content-type:",
+        "content-length:",
+        "cache-control:",
+        "cookie:",
+        "authorization:",
+        "upgrade-insecure-requests:",
+        "sec-",
+        "x-forwarded-",
+    ];
+    PREFIXES.iter().any(|prefix| lower.starts_with(prefix))
+}
+
+pub(crate) fn detect_non_telnet_probe(line: &str) -> Option<&'static str> {
+    let trimmed = line.trim();
+    let upper = trimmed.to_ascii_uppercase();
+
+    const HTTP_METHODS: &[&str] = &[
+        "GET ",
+        "POST ",
+        "HEAD ",
+        "PUT ",
+        "DELETE ",
+        "OPTIONS ",
+        "PATCH ",
+        "CONNECT ",
+        "TRACE ",
+        "PROPFIND ",
+        "PRI *",
+    ];
+
+    if upper.contains(" HTTP/")
+        || HTTP_METHODS.iter().any(|m| upper.starts_with(m))
+        || is_http_header_line(trimmed)
+    {
+        return Some("HTTP");
+    }
+
+    if upper.starts_with("SSH-") {
+        return Some("SSH");
+    }
+
+    if upper.contains(" RTSP/") {
+        return Some("RTSP");
+    }
+
+    if upper.contains(" SIP/") {
+        return Some("SIP");
+    }
+
+    if upper.starts_with("EHLO ") || upper.starts_with("HELO ") || upper.starts_with("MAIL FROM:") {
+        return Some("SMTP");
+    }
+
+    if upper.starts_with("PROXY ") {
+        return Some("PROXY");
+    }
+
+    if upper.starts_with("MGLNDD_") {
+        return Some("scanner");
+    }
+
+    if trimmed.starts_with('{') || trimmed.starts_with('<') {
+        return Some("non-telnet");
+    }
+
+    None
+}
+
+pub(crate) fn is_suspicious_telnet_username(username: &str) -> bool {
+    detect_non_telnet_probe(username).is_some()
+        || username.len() > 64
+        || username.bytes().any(|b| {
+            b.is_ascii_whitespace()
+                || matches!(
+                    b,
+                    b'<' | b'>' | b'"' | b'`' | b'|' | b'{' | b'}' | b'[' | b']' | b';' | b'&' | b'$'
+                )
+        })
+}
 
 pub async fn start(
     port: u16,
@@ -76,25 +179,26 @@ pub async fn start(
     }
 }
 
-/// Read a line from the socket, filtering out telnet IAC commands (bounded to 4KB)
+/// Read a line from the socket, filtering out telnet IAC commands and rejecting binary probes
 async fn read_telnet_line(
     socket: &mut tokio::net::tcp::OwnedReadHalf,
     ip: &str,
-) -> Option<String> {
-    const MAX_LINE: usize = 4096;
+) -> TelnetReadResult {
     let mut result = Vec::new();
     let mut buf = [0u8; 1];
     let mut in_iac = false;
     let mut in_subneg = false;
+    let mut bytes_read = 0usize;
 
     let timeout = tokio::time::timeout(std::time::Duration::from_secs(30), async {
         loop {
             match socket.read(&mut buf).await {
                 Ok(0) => {
                     debug!("Telnet EOF from {}", ip);
-                    return None;
+                    return TelnetReadResult::Eof(bytes_read);
                 }
                 Ok(_) => {
+                    bytes_read += 1;
                     let byte = buf[0];
 
                     if in_subneg {
@@ -120,8 +224,9 @@ async fn read_telnet_line(
                             WILL | WONT | DO | DONT => {
                                 in_iac = false;
                                 if socket.read(&mut buf).await.is_err() {
-                                    return None;
+                                    return TelnetReadResult::Eof(bytes_read);
                                 }
+                                bytes_read += 1;
                             }
                             SB => {
                                 in_subneg = true;
@@ -139,11 +244,19 @@ async fn read_telnet_line(
                         continue;
                     }
 
+                    if is_binary_byte(byte) {
+                        debug!("Telnet binary probe byte 0x{:02x} from {}", byte, ip);
+                        return TelnetReadResult::BinaryProbe(bytes_read);
+                    }
+
                     if byte == b'\n' || byte == b'\r' {
                         if result.is_empty() {
                             continue;
                         }
-                        break;
+                        return TelnetReadResult::Line(
+                            String::from_utf8_lossy(&result).to_string(),
+                            bytes_read,
+                        );
                     }
 
                     if (32..127).contains(&byte) && result.len() < MAX_LINE {
@@ -152,15 +265,15 @@ async fn read_telnet_line(
                 }
                 Err(e) => {
                     debug!("Telnet read error from {}: {}", ip, e);
-                    return None;
+                    return TelnetReadResult::Eof(bytes_read);
                 }
             }
         }
-
-        Some(String::from_utf8_lossy(&result).to_string())
     });
 
-    timeout.await.ok().flatten()
+    timeout
+        .await
+        .unwrap_or(TelnetReadResult::Eof(bytes_read))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -194,15 +307,37 @@ async fn handle_telnet_session(
     let mut canary_triggered = false;
     let mut shell: Option<FakeShell> = None;
     let mut state = 0;
+    let mut raw_bytes_read: usize = 0;
+    let mut aborted_probe: Option<(&'static str, Option<String>)> = None;
 
     let session_timeout = tokio::time::timeout(std::time::Duration::from_secs(120), async {
         loop {
-            let Some(input) = read_telnet_line(&mut reader, &ip).await else {
-                break;
+            let input = match read_telnet_line(&mut reader, &ip).await {
+                TelnetReadResult::Line(line, n) => {
+                    raw_bytes_read += n;
+                    line
+                }
+                TelnetReadResult::BinaryProbe(n) => {
+                    raw_bytes_read += n;
+                    if state < 2 {
+                        aborted_probe = Some(("binary", None));
+                    }
+                    break;
+                }
+                TelnetReadResult::Eof(n) => {
+                    raw_bytes_read += n;
+                    break;
+                }
             };
 
             match state {
                 0 => {
+                    if is_suspicious_telnet_username(&input) {
+                        let kind = detect_non_telnet_probe(&input).unwrap_or("non-telnet");
+                        let snippet: String = input.chars().take(120).collect();
+                        aborted_probe = Some((kind, Some(snippet)));
+                        break;
+                    }
                     username = input;
                     if writer.write_all(b"Password: ").await.is_err()
                         || writer.flush().await.is_err()
@@ -212,6 +347,13 @@ async fn handle_telnet_session(
                     state = 1;
                 }
                 1 => {
+                    if is_http_header_line(&input) || detect_non_telnet_probe(&input).is_some() {
+                        let kind = detect_non_telnet_probe(&input).unwrap_or("HTTP");
+                        let snippet: String = input.chars().take(120).collect();
+                        username.clear();
+                        aborted_probe = Some((kind, Some(snippet)));
+                        break;
+                    }
                     password = input;
                     let fs = FakeShell::new(&hostname, &persona, &username);
                     let banner = fs.welcome_banner(&ip);
@@ -266,22 +408,29 @@ async fn handle_telnet_session(
 
     let _ = session_timeout.await;
 
-    let request = if !username.is_empty() {
+    let has_valid_creds = state >= 2 && !username.is_empty() && aborted_probe.is_none();
+    let request = if let Some((kind, snippet)) = &aborted_probe {
+        match snippet {
+            Some(s) => format!("Telnet non-telnet probe ({}): {} from {}", kind, s, ip),
+            None => format!("Telnet non-telnet probe ({}) from {}", kind, ip),
+        }
+    } else if has_valid_creds {
         format!("Telnet login: {}:{} from {}", username, password, ip)
     } else {
         format!("Telnet connection from {}", ip)
     };
 
     let mut event = AttackEvent::new(ip.clone(), service, port, request);
-    let request_size: u32 = username.len() as u32
+    let computed_size: u32 = username.len() as u32
         + password.len() as u32
         + commands.iter().map(|c| c.len() as u32 + 2).sum::<u32>();
+    let request_size = (raw_bytes_read as u32).max(computed_size);
     event = event.with_request_size(request_size);
 
-    if !username.is_empty() {
+    if has_valid_creds {
         event = event.with_credentials(username, password);
     }
-    if !commands.is_empty() {
+    if !commands.is_empty() && aborted_probe.is_none() {
         event = event.with_payload(commands.join("\n").into_bytes());
     }
     if !extracted_iocs.is_empty() {
@@ -292,4 +441,22 @@ async fn handle_telnet_session(
     }
 
     classifier::record_event(event, &geoip, &write_tx, &event_bus);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_http_scanner_and_shell_probes_as_telnet_usernames() {
+        assert!(is_suspicious_telnet_username("GET / HTTP/1.1"));
+        assert!(is_suspicious_telnet_username("Host: 192.0.2.1:23"));
+        assert!(is_suspicious_telnet_username("MGLNDD_192.0.2.1_2323"));
+        assert!(is_suspicious_telnet_username(
+            "id;for t in curl wget;do command -v $t;done"
+        ));
+        assert!(is_http_header_line("Host: example.com:23"));
+        assert!(!is_suspicious_telnet_username("root"));
+        assert!(!is_suspicious_telnet_username("telecomadmin"));
+    }
 }

@@ -37,6 +37,14 @@ impl WriteSender {
     pub fn dropped_count(&self) -> u64 {
         self.dropped.load(Ordering::Relaxed)
     }
+
+    #[cfg(test)]
+    pub fn for_test(tx: mpsc::Sender<AttackEvent>) -> Self {
+        Self {
+            tx,
+            dropped: Arc::new(AtomicU64::new(0)),
+        }
+    }
 }
 
 /// Start the write buffer background task with a bounded queue capacity.

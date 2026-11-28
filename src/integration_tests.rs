@@ -315,7 +315,8 @@ async fn integration_mysql_and_postgres_and_rdp_and_ollama() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(ev.username.as_deref(), Some("admin"));
+    assert!(ev.request.contains("mstshash=admin"));
+    assert!(ev.username.is_none());
     h_rdp.abort();
 
     // 4. Ollama HTTP API

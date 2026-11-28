@@ -111,9 +111,6 @@ async fn handle_rdp_session(
 
     let req_size = payload.as_ref().map(|p| p.len() as u32).unwrap_or(0);
     let mut event = AttackEvent::new(ip, service, port, request).with_request_size(req_size);
-    if let Some(u) = username {
-        event = event.with_credentials(u, String::new());
-    }
     if let Some(p) = payload {
         event = event.with_payload(p);
     }

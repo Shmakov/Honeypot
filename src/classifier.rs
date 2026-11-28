@@ -203,9 +203,12 @@ pub fn classify_event(event: &AttackEvent, decoded_payload: Option<&str>) -> Cla
         ("censys", "scanner:censys"),
         ("binaryedge", "scanner:binaryedge"),
         ("expanse", "scanner:expanse"),
+        ("xpanse", "scanner:palo-alto"),
         ("palo alto", "scanner:palo-alto"),
+        ("paloaltonetworks", "scanner:palo-alto"),
         ("stretchoid", "scanner:stretchoid"),
         ("internetmeasurement", "scanner:internetmeasurement"),
+        ("internet-measurement", "scanner:internetmeasurement"),
         ("shadowserver", "scanner:shadowserver"),
         ("leakix", "scanner:leakix"),
         ("onyphe", "scanner:onyphe"),
@@ -213,6 +216,10 @@ pub fn classify_event(event: &AttackEvent, decoded_payload: Option<&str>) -> Cla
         ("zoomeye", "scanner:zoomeye"),
         ("bitsight", "scanner:bitsight"),
         ("securityscorecard", "scanner:securityscorecard"),
+        ("driftnet", "scanner:driftnet"),
+        ("modat", "scanner:modat"),
+        ("infrawatch", "scanner:infrawatch"),
+        ("uptimerobot", "scanner:uptimerobot"),
     ];
 
     for (needle, tag) in scanner_match {
@@ -225,7 +232,7 @@ pub fn classify_event(event: &AttackEvent, decoded_payload: Option<&str>) -> Cla
     Classification { tags, is_scanner }
 }
 
-/// Enrich an event (GeoIP City + ASN, IOC extraction, attack classification), queue for DB write,
+/// Enrich an event (GeoIP City + ASN, attack classification, IOC extraction), queue for DB write,
 /// and broadcast to live SSE subscribers.
 pub fn record_event(
     mut event: AttackEvent,
@@ -252,22 +259,27 @@ pub fn record_event(
         .and_then(|hex_str| hex::decode(hex_str).ok())
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned());
 
-    // Extract IOCs aware of protocol context (ignores benign HTTP Referer/UA URLs)
-    for item in ioc::extract_iocs_for_event(
-        &event.service,
-        &event.request,
-        event.http_path.as_deref(),
-        decoded_payload.as_deref(),
-    ) {
-        if !event.iocs.iter().any(|existing| existing == &item) {
-            event.iocs.push(item);
-        }
-    }
-    event.iocs.truncate(20);
-
     let classification = classify_event(&event, decoded_payload.as_deref());
     event.tags = classification.tags;
     event.is_scanner = classification.is_scanner;
+
+    if event.is_scanner {
+        // Known benign scanners & monitors carry documentation URLs, not attacker IOCs.
+        event.iocs.clear();
+    } else {
+        // Extract IOCs aware of protocol context (ignores benign HTTP Referer/UA URLs)
+        for item in ioc::extract_iocs_for_event(
+            &event.service,
+            &event.request,
+            event.http_path.as_deref(),
+            decoded_payload.as_deref(),
+        ) {
+            if !event.iocs.iter().any(|existing| existing == &item) {
+                event.iocs.push(item);
+            }
+        }
+        event.iocs.truncate(20);
+    }
 
     write_tx.send(event.clone());
     event_bus.publish(event);
@@ -307,5 +319,46 @@ mod tests {
         let redis_ev = AttackEvent::new("8.8.8.8".into(), "redis".into(), 6379, "SLAVEOF 1.2.3.4 6379".into());
         let res2 = classify_event(&redis_ev, Some("CONFIG SET dir /var/spool/cron"));
         assert!(res2.tags.contains(&"redis-rce".to_string()));
+    }
+
+    #[test]
+    fn classifies_extended_scanners_and_skips_iocs() {
+        let mut xpanse = AttackEvent::new("1.2.3.4".into(), "http".into(), 80, "GET /".into());
+        xpanse.user_agent = Some("Hello from Palo Alto Networks, find out more in https://docs-cortex.paloaltonetworks.com/r/1/Cortex-Xpanse/Scanning-activity".into());
+        let r1 = classify_event(&xpanse, None);
+        assert!(r1.is_scanner);
+        assert!(r1.tags.contains(&"scanner:palo-alto".to_string()));
+
+        let mut driftnet = AttackEvent::new("1.2.3.5".into(), "unknown".into(), 8090, "Connection".into());
+        driftnet.asn_org = Some("Driftnet Ltd".into());
+        let r2 = classify_event(&driftnet, None);
+        assert!(r2.is_scanner);
+        assert!(r2.tags.contains(&"scanner:driftnet".to_string()));
+
+        let mut uptime = AttackEvent::new("1.2.3.6".into(), "http".into(), 80, "GET /".into());
+        uptime.user_agent = Some("Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)".into());
+        let r3 = classify_event(&uptime, None);
+        assert!(r3.is_scanner);
+        assert!(r3.tags.contains(&"scanner:uptimerobot".to_string()));
+
+        let mut infrawatch = AttackEvent::new("1.2.3.7".into(), "http-proxy".into(), 8080, "GET /".into());
+        infrawatch.user_agent = Some("Mozilla/5.0 (compatible; Infrawatch/1.0; +https://infrawat.ch/)".into());
+        let r4 = classify_event(&infrawatch, None);
+        assert!(r4.is_scanner);
+        assert!(r4.tags.contains(&"scanner:infrawatch".to_string()));
+
+        // Verify record_event clears IOCs for scanners
+        let (tx, _rx) = tokio::sync::broadcast::channel(8);
+        let bus = EventBus::new(tx);
+        let geoip = GeoIp::new("nonexistent.mmdb", "nonexistent_asn.mmdb");
+        let (wtx, mut wrx) = tokio::sync::mpsc::channel(8);
+        let sender = WriteSender::for_test(wtx);
+        let ev = AttackEvent::new("1.2.3.7".into(), "unknown".into(), 8090, "Connection".into())
+            .with_payload(b"GET / HTTP/1.1\r\nUser-Agent: Infrawatch/1.0 (+https://infrawat.ch/)\r\n\r\n".to_vec())
+            .with_user_agent("Infrawatch/1.0 (+https://infrawat.ch/)".into());
+        record_event(ev, &geoip, &sender, &bus);
+        let recorded = wrx.try_recv().unwrap();
+        assert!(recorded.is_scanner);
+        assert!(recorded.iocs.is_empty());
     }
 }

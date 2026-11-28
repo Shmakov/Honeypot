@@ -125,6 +125,59 @@ fn build_json_response(service: &str, path: &str, hostname: &str) -> (u16, Strin
     }
 }
 
+fn find_header_body_split(raw: &[u8]) -> Option<(usize, usize)> {
+    if let Some(pos) = raw.windows(4).position(|w| w == b"\r\n\r\n") {
+        Some((pos, pos + 4))
+    } else if let Some(pos) = raw.windows(2).position(|w| w == b"\n\n") {
+        Some((pos, pos + 2))
+    } else {
+        None
+    }
+}
+
+/// Parse an HTTP/1.x request into `(path, user_agent, optional_body)`.
+/// Returns `None` for non-HTTP / TLS / binary probes so binary bytes never pollute `http_path`.
+fn parse_http_request(raw: &[u8]) -> Option<(String, Option<String>, Option<Vec<u8>>)> {
+    const METHODS: &[&str] = &[
+        "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", "CONNECT", "TRACE",
+    ];
+
+    let (hdr_end, body_start) = find_header_body_split(raw).unwrap_or((raw.len(), raw.len()));
+    let header_text = std::str::from_utf8(&raw[..hdr_end]).ok()?;
+    let first_line = header_text.lines().next()?.trim_end_matches('\r');
+    let mut parts = first_line.split_whitespace();
+    let method = parts.next()?;
+    let path = parts.next()?;
+    let version = parts.next()?;
+
+    if !METHODS.contains(&method) || !version.starts_with("HTTP/") {
+        return None;
+    }
+    if path.is_empty()
+        || path.len() > 2048
+        || !path.bytes().all(|b| (0x21..=0x7e).contains(&b))
+    {
+        return None;
+    }
+
+    let user_agent = header_text
+        .lines()
+        .skip(1)
+        .find(|l| l.to_ascii_lowercase().starts_with("user-agent:"))
+        .and_then(|l| l.split_once(':'))
+        .map(|(_, v)| v.trim())
+        .filter(|v| !v.is_empty() && v.bytes().all(|b| (0x20..=0x7e).contains(&b)))
+        .map(|v| v.to_string());
+
+    let body = if body_start < raw.len() {
+        Some(raw[body_start..].to_vec())
+    } else {
+        None
+    };
+
+    Some((path.to_string(), user_agent, body))
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn handle_http_api_session(
     mut socket: tokio::net::TcpStream,
@@ -158,22 +211,22 @@ async fn handle_http_api_session(
         }
     };
 
-    let text = String::from_utf8_lossy(&raw).into_owned();
-    let first_line = text.lines().next().unwrap_or("").trim().to_string();
-    let path = first_line
-        .split_whitespace()
-        .nth(1)
-        .unwrap_or("/")
-        .to_string();
+    let Some((path, user_agent, body)) = parse_http_request(&raw) else {
+        let req_desc = format!(
+            "Non-HTTP probe ({} bytes) from {} to port {}",
+            raw.len(),
+            ip,
+            port
+        );
+        let event = AttackEvent::new(ip, service, port, req_desc)
+            .with_request_size(raw.len() as u32)
+            .with_payload(raw);
+        classifier::record_event(event, &geoip, &write_tx, &event_bus);
+        return;
+    };
 
-    let user_agent = text
-        .lines()
-        .find(|l| l.to_ascii_lowercase().starts_with("user-agent:"))
-        .and_then(|l| l.split_once(':'))
-        .map(|(_, v)| v.trim().to_string());
-
-    let (status, body) = build_json_response(&service, &path, &hostname);
-    let content_type = if body.starts_with('{') || body.starts_with('[') {
+    let (status, resp_body) = build_json_response(&service, &path, &hostname);
+    let content_type = if resp_body.starts_with('{') || resp_body.starts_with('[') {
         "application/json"
     } else {
         "text/plain"
@@ -182,18 +235,40 @@ async fn handle_http_api_session(
         "HTTP/1.1 {} OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         status,
         content_type,
-        body.len(),
-        body
+        resp_body.len(),
+        resp_body
     );
     let _ = socket.write_all(http_resp.as_bytes()).await;
 
-    let mut event = AttackEvent::new(ip, service, port, text.clone())
-        .with_request_size(raw.len() as u32)
-        .with_payload(raw);
+    let (hdr_end, _) = find_header_body_split(&raw).unwrap_or((raw.len(), raw.len()));
+    let header_text = String::from_utf8_lossy(&raw[..hdr_end]).into_owned();
+
+    let mut event = AttackEvent::new(ip, service, port, header_text)
+        .with_request_size(raw.len() as u32);
+    if let Some(b) = body {
+        event = event.with_payload(b);
+    }
     event.http_path = Some(path);
     if let Some(ua) = user_agent {
         event = event.with_user_agent(ua);
     }
 
     classifier::record_event(event, &geoip, &write_tx, &event_bus);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_tls_and_splits_http_headers_from_body() {
+        let tls = b"\x16\x03\x01\x00\x20\x01\x00\x00\x1c\x03\x03abcd";
+        assert!(parse_http_request(tls).is_none());
+
+        let http = b"POST /api/chat HTTP/1.1\r\nHost: 127.0.0.1:11434\r\nUser-Agent: test/1.0\r\n\r\n{\"model\":\"llama3\"}";
+        let (path, ua, body) = parse_http_request(http).unwrap();
+        assert_eq!(path, "/api/chat");
+        assert_eq!(ua.as_deref(), Some("test/1.0"));
+        assert_eq!(body.as_deref(), Some(b"{\"model\":\"llama3\"}".as_slice()));
+    }
 }

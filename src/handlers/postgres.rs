@@ -60,8 +60,8 @@ pub async fn start(
 
 fn parse_startup_params(body: &[u8]) -> HashMap<String, String> {
     let mut map = HashMap::new();
-    // Skip 4-byte protocol version (0x00030000)
-    if body.len() <= 4 {
+    // Require Postgres v3.0 protocol version (0x00030000)
+    if body.len() <= 4 || body[..4] != [0x00, 0x03, 0x00, 0x00] {
         return map;
     }
     let parts: Vec<&[u8]> = body[4..].split(|&b| b == 0).collect();
@@ -185,8 +185,14 @@ async fn handle_pg_session(
 
     let mut event =
         AttackEvent::new(ip, service, port, request).with_request_size(raw_bytes.len() as u32);
-    if let Some(u) = username {
-        event = event.with_credentials(u, password.unwrap_or_default());
+    match (username, password) {
+        (Some(u), Some(p)) if !u.is_empty() => {
+            event = event.with_credentials(u, p);
+        }
+        (Some(u), None) if !u.is_empty() => {
+            event.username = Some(u);
+        }
+        _ => {}
     }
     if !raw_bytes.is_empty() {
         event = event.with_payload(raw_bytes);

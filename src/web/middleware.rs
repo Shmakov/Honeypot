@@ -113,7 +113,17 @@ where
 
         Box::pin(async move {
             let method = request.method().to_string();
-            let uri = request.uri().path().to_string();
+            let uri_path = request.uri().path();
+            let uri = if uri_path.is_empty() {
+                request
+                    .uri()
+                    .authority()
+                    .map(|a| a.as_str())
+                    .unwrap_or("")
+                    .to_string()
+            } else {
+                uri_path.to_string()
+            };
             let query = request
                 .uri()
                 .query()

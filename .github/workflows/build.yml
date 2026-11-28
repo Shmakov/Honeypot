@@ -61,8 +61,6 @@ jobs:
           cp target/release/honeypot honeypot-linux/
           cp -r static honeypot-linux/
           cp config.toml honeypot-linux/
-          # Copy migrations if they exist
-          [ -d "migrations" ] && cp -r migrations honeypot-linux/ || true
           # Create a placeholder for GeoIP database
           echo "Place GeoLite2-City.mmdb here" > honeypot-linux/data/README.txt
           tar -czvf honeypot-linux.tar.gz honeypot-linux
@@ -108,13 +106,6 @@ jobs:
           scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
             honeypot-linux/static \
             ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/
-          
-          # Copy migrations if they exist
-          if [ -d "honeypot-linux/migrations" ]; then
-            scp -P ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r \
-              honeypot-linux/migrations \
-              ${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:/opt/honeypot/
-          fi
           
           # Stop, swap binary, start - all in one SSH session
           ssh -T -p ${{ secrets.GCP_SSH_PORT }} -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \

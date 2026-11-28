@@ -113,9 +113,26 @@ fn parse_handshake_response(pkt: &[u8]) -> Option<(String, Option<String>)> {
     if pkt.len() <= 36 {
         return None;
     }
+
+    // Validate MySQL packet framing: 3-byte LE payload length, sequence id == 1, 23 zero reserved bytes
+    let pkt_len = (pkt[0] as usize) | ((pkt[1] as usize) << 8) | ((pkt[2] as usize) << 16);
+    if pkt[3] != 1 || !(32..=4096).contains(&pkt_len) {
+        return None;
+    }
+    if !pkt[13..36].iter().all(|&b| b == 0) {
+        return None;
+    }
+
     let rest = &pkt[36..];
     let nul_pos = rest.iter().position(|&b| b == 0)?;
-    let user = String::from_utf8_lossy(&rest[..nul_pos]).into_owned();
+    let user_str = std::str::from_utf8(&rest[..nul_pos]).ok()?;
+    if user_str.is_empty()
+        || user_str.len() > 64
+        || !user_str.bytes().all(|b| (0x20..=0x7e).contains(&b))
+    {
+        return None;
+    }
+    let user = user_str.to_string();
     let after_user = &rest[nul_pos + 1..];
 
     // Check CLIENT_CONNECT_WITH_DB (0x0008)
@@ -126,9 +143,11 @@ fn parse_handshake_response(pkt: &[u8]) -> Option<(String, Option<String>)> {
         if after_user.len() > 1 + auth_len {
             let db_slice = &after_user[1 + auth_len..];
             if let Some(db_nul) = db_slice.iter().position(|&b| b == 0) {
-                let d = String::from_utf8_lossy(&db_slice[..db_nul]).into_owned();
-                if !d.is_empty() {
-                    db_name = Some(d);
+                if let Ok(d) = std::str::from_utf8(&db_slice[..db_nul]) {
+                    if !d.is_empty() && d.len() <= 64 && d.bytes().all(|b| (0x20..=0x7e).contains(&b))
+                    {
+                        db_name = Some(d.to_string());
+                    }
                 }
             }
         }
@@ -187,7 +206,7 @@ async fn handle_mysql_session(
     let mut event = AttackEvent::new(ip, service, port, request).with_request_size(req_size);
     if let Some(u) = username {
         if !u.is_empty() {
-            event = event.with_credentials(u, String::new());
+            event.username = Some(u);
         }
     }
     if let Some(p) = payload {
@@ -195,4 +214,34 @@ async fn handle_mysql_session(
     }
 
     classifier::record_event(event, &geoip, &write_tx, &event_bus);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_tls_client_hello_and_parses_valid_handshake() {
+        // TLS 1.2 ClientHello bytes
+        let tls_hello = [
+            0x16, 0x03, 0x01, 0x00, 0xfc, 0x01, 0x00, 0x00, 0xf8, 0x03, 0x03, 0x9f, 0x56, 0xce,
+            0xe5, 0x8b, 0x22, 0xe3, 0x3a, 0x5f, 0x08, 0xae, 0x4e, 0xf2, 0x76, 0x9d, 0x65, 0x83,
+            0xb5, 0x80, 0xf5, 0x52, 0xf7, 0x28, 0xe9, 0xfd, 0xc9, 0xe6, 0x20, 0x00,
+        ];
+        assert!(parse_handshake_response(&tls_hello).is_none());
+
+        let mut valid = vec![0u8; 4];
+        valid.extend_from_slice(&0x0000_0008u32.to_le_bytes()); // CLIENT_CONNECT_WITH_DB
+        valid.extend_from_slice(&[0u8; 28]); // max_packet (4) + charset (1) + reserved (23)
+        valid.extend_from_slice(b"root\0");
+        valid.push(0); // auth_len = 0
+        valid.extend_from_slice(b"appdb\0");
+        let len = (valid.len() - 4) as u32;
+        valid[0] = (len & 0xff) as u8;
+        valid[3] = 1;
+        assert_eq!(
+            parse_handshake_response(&valid),
+            Some(("root".to_string(), Some("appdb".to_string())))
+        );
+    }
 }

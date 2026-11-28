@@ -149,17 +149,20 @@ impl Database {
         Ok(Self { pool })
     }
 
-    async fn ensure_column(&self, table: &str, col: &str, col_def: &str) -> Result<()> {
+    async fn ensure_columns(&self, table: &str, cols: &[(&str, &str)]) -> Result<()> {
         let pragma_sql = format!("PRAGMA table_info({})", table);
         let rows: Vec<(i64, String, String, i64, Option<String>, i64)> =
             sqlx::query_as(sqlx::AssertSqlSafe(pragma_sql))
                 .fetch_all(&self.pool)
                 .await?;
-        if !rows.iter().any(|(_, name, _, _, _, _)| name == col) {
-            let alter_sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, col, col_def);
-            sqlx::query(sqlx::AssertSqlSafe(alter_sql))
-                .execute(&self.pool)
-                .await?;
+        let existing: HashSet<String> = rows.into_iter().map(|(_, name, _, _, _, _)| name).collect();
+        for &(col, col_def) in cols {
+            if !existing.contains(col) {
+                let alter_sql = format!("ALTER TABLE {} ADD COLUMN {} {}", table, col, col_def);
+                sqlx::query(sqlx::AssertSqlSafe(alter_sql))
+                    .execute(&self.pool)
+                    .await?;
+            }
         }
         Ok(())
     }
@@ -180,23 +183,29 @@ impl Database {
             .execute(&self.pool)
             .await?;
 
-        // Idempotent column upgrades for existing databases
-        self.ensure_column("requests", "asn", "INTEGER").await?;
-        self.ensure_column("requests", "asn_org", "TEXT").await?;
-        self.ensure_column("requests", "tags", "TEXT").await?;
-        self.ensure_column("requests", "is_scanner", "INTEGER DEFAULT 0")
-            .await?;
+        // Idempotent column upgrades for existing databases (one PRAGMA per table)
+        self.ensure_columns(
+            "requests",
+            &[
+                ("asn", "INTEGER"),
+                ("asn_org", "TEXT"),
+                ("tags", "TEXT"),
+                ("is_scanner", "INTEGER DEFAULT 0"),
+            ],
+        )
+        .await?;
 
-        self.ensure_column("stats_daily", "command_counts", "TEXT")
-            .await?;
-        self.ensure_column("stats_daily", "user_agent_counts", "TEXT")
-            .await?;
-        self.ensure_column("stats_daily", "port_counts", "TEXT")
-            .await?;
-        self.ensure_column("stats_daily", "tag_counts", "TEXT")
-            .await?;
-        self.ensure_column("stats_daily", "asn_counts", "TEXT")
-            .await?;
+        self.ensure_columns(
+            "stats_daily",
+            &[
+                ("command_counts", "TEXT"),
+                ("user_agent_counts", "TEXT"),
+                ("port_counts", "TEXT"),
+                ("tag_counts", "TEXT"),
+                ("asn_counts", "TEXT"),
+            ],
+        )
+        .await?;
 
         // Covering indexes
         sqlx::query(schema::CREATE_INDEX_TS_SERVICE)
@@ -220,10 +229,6 @@ impl Database {
         sqlx::query(schema::CREATE_INDEX_IOCS_VALUE)
             .execute(&self.pool)
             .await?;
-
-        for stmt in schema::DROP_UNUSED_INDEXES {
-            sqlx::query(*stmt).execute(&self.pool).await?;
-        }
 
         Ok(())
     }
@@ -359,7 +364,7 @@ impl Database {
 
     pub async fn get_recent_credentials(&self, limit: i32) -> Result<Vec<(String, String)>> {
         let rows: Vec<(String, String)> = sqlx::query_as(
-            "SELECT username, password FROM requests WHERE username IS NOT NULL ORDER BY id DESC LIMIT ?",
+            "SELECT username, password FROM requests WHERE username IS NOT NULL AND password IS NOT NULL ORDER BY id DESC LIMIT ?",
         )
         .bind(limit)
         .fetch_all(&self.pool)
@@ -687,7 +692,7 @@ impl Database {
             r#"
             SELECT username, password, COUNT(*) as count
             FROM requests
-            WHERE timestamp >= ? AND +username IS NOT NULL
+            WHERE timestamp >= ? AND +username IS NOT NULL AND password IS NOT NULL
             GROUP BY username, password
             ORDER BY count DESC
             LIMIT ?
@@ -1164,7 +1169,7 @@ impl Database {
             .bind(live_since)
             .fetch_all(&self.pool),
             sqlx::query_as::<_, (String,)>(
-                "SELECT payload FROM requests WHERE timestamp >= ? AND payload IS NOT NULL AND (service = 'ssh' OR service = 'ssh-alt' OR service = 'telnet' OR service = 'telnet-alt') ORDER BY id DESC LIMIT 1000"
+                "SELECT payload FROM requests WHERE timestamp >= ? AND service IN ('ssh', 'ssh-alt', 'telnet', 'telnet-alt') AND payload IS NOT NULL LIMIT 5000"
             )
             .bind(live_since)
             .fetch_all(&self.pool),
@@ -1311,7 +1316,7 @@ impl Database {
 
         let cred_rows: Vec<(String, String, i64)> = sqlx::query_as(
             r#"SELECT username, password, COUNT(*) as c FROM requests
-               WHERE timestamp >= ? AND timestamp < ? AND +username IS NOT NULL
+               WHERE timestamp >= ? AND timestamp < ? AND +username IS NOT NULL AND password IS NOT NULL
                GROUP BY username, password ORDER BY c DESC LIMIT 100"#,
         )
         .bind(day_start)
@@ -2040,7 +2045,7 @@ mod tests {
             EXPLAIN QUERY PLAN
             SELECT username, password, COUNT(*) as count
             FROM requests
-            WHERE timestamp >= ? AND +username IS NOT NULL
+            WHERE timestamp >= ? AND +username IS NOT NULL AND password IS NOT NULL
             GROUP BY username, password
             ORDER BY count DESC
             LIMIT ?
@@ -2107,7 +2112,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_migrations_idempotent_on_legacy_schema_and_drops_unused_indexes() {
+    async fn test_migrations_idempotent_on_legacy_schema() {
         let path =
             std::env::temp_dir().join(format!("honeypot_legacy_{}.db", uuid::Uuid::new_v4()));
         let cfg = DatabaseConfig {
@@ -2125,22 +2130,19 @@ mod tests {
         sqlx::query(
             "CREATE TABLE stats_daily (day_bucket INTEGER PRIMARY KEY, total_requests INTEGER NOT NULL DEFAULT 0, country_counts TEXT, service_counts TEXT, path_counts TEXT, credential_counts TEXT, location_counts TEXT, total_bytes INTEGER DEFAULT 0, ip_request_counts TEXT, ip_bytes_counts TEXT)"
         ).execute(&db.pool).await.unwrap();
-        sqlx::query("CREATE INDEX idx_credentials ON requests(username, id DESC) WHERE username IS NOT NULL")
-            .execute(&db.pool)
-            .await
-            .unwrap();
 
         // Run migrations twice to verify idempotency
         db.run_migrations().await.unwrap();
         db.run_migrations().await.unwrap();
 
-        let legacy_indexes: Vec<(String,)> = sqlx::query_as(
-            "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_credentials'",
-        )
-        .fetch_all(&db.pool)
-        .await
-        .unwrap();
-        assert!(legacy_indexes.is_empty());
+        let req_cols: Vec<(i64, String, String, i64, Option<String>, i64)> =
+            sqlx::query_as("PRAGMA table_info(requests)")
+                .fetch_all(&db.pool)
+                .await
+                .unwrap();
+        for col in ["asn", "asn_org", "tags", "is_scanner"] {
+            assert!(req_cols.iter().any(|(_, name, _, _, _, _)| name == col));
+        }
 
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{}-wal", path.display()));
